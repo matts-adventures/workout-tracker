@@ -542,57 +542,91 @@
 
 <script>
 /* ===========================
-   Store
+   Store + migration
    =========================== */
-const STORE_KEY = "workout_tracker_session_checklist_v3";
+const STORE_KEY = "workout_tracker_session_checklist_v4";
+const LEGACY_KEYS = ["workout_tracker_session_checklist_v3"];
+
 const norm = (s) => String(s ?? "").trim().replace(/\s+/g, " ");
 const todayISO = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 };
 
+function baseDefaultStore(){
+  return {
+    version: 4,
+    customExercises: [],
+    sessions: {},
+    ui: {
+      filters: { upper:false, lower:false, core:false, cardio:false },
+      hiddenExercises: []
+    }
+  };
+}
+
+function normalizeStore(parsedRaw){
+  const parsed = parsedRaw && typeof parsedRaw === "object" ? parsedRaw : {};
+  parsed.version ??= 4;
+  parsed.customExercises ??= [];
+  parsed.sessions ??= {};
+  parsed.ui ??= {};
+  parsed.ui.filters ??= { upper:false, lower:false, core:false, cardio:false };
+  parsed.ui.hiddenExercises ??= [];
+
+  for(const k of ["upper","lower","core","cardio"]){
+    parsed.ui.filters[k] = Boolean(parsed.ui.filters[k]);
+  }
+  if(!Array.isArray(parsed.ui.hiddenExercises)){
+    parsed.ui.hiddenExercises = [];
+  }
+
+  for(const [date, s] of Object.entries(parsed.sessions)){
+    s.completed ??= {};
+    s.inProgress ??= null;
+    s.workout ??= { startedAt: null, endedAt: null };
+    s.workout.startedAt ??= null;
+    s.workout.endedAt ??= null;
+  }
+
+  parsed.version = 4;
+  return parsed;
+}
+
 function loadStore(){
   try{
+    // 1) Try primary key (v4)
     const raw = localStorage.getItem(STORE_KEY);
-    if(!raw){
-      return {
-        version: 4,
-        customExercises: [],
-        sessions: {},
-        ui: {
-          filters: { upper:false, lower:false, core:false, cardio:false },
-          hiddenExercises: []
-        }
-      };
+    if(raw){
+      const parsed = JSON.parse(raw);
+      return normalizeStore(parsed);
     }
-    const parsed = JSON.parse(raw);
-    parsed.version ??= 4;
-    parsed.customExercises ??= [];
-    parsed.sessions ??= {};
-    parsed.ui ??= {};
-    parsed.ui.filters ??= { upper:false, lower:false, core:false, cardio:false };
-    parsed.ui.hiddenExercises ??= [];
-    for(const k of ["upper","lower","core","cardio"]) parsed.ui.filters[k] = Boolean(parsed.ui.filters[k]);
-    if(!Array.isArray(parsed.ui.hiddenExercises)) parsed.ui.hiddenExercises = [];
 
-    for(const [date, s] of Object.entries(parsed.sessions)){
-      s.completed ??= {};
-      s.inProgress ??= null;
-      s.workout ??= { startedAt: null, endedAt: null };
-      s.workout.startedAt ??= null;
-      s.workout.endedAt ??= null;
-    }
-    return parsed;
-  }catch{
-    return {
-      version: 4,
-      customExercises: [],
-      sessions: {},
-      ui: {
-        filters: { upper:false, lower:false, core:false, cardio:false },
-        hiddenExercises: []
+    // 2) Try legacy keys (e.g., v3)
+    for(const legacyKey of LEGACY_KEYS){
+      const legacyRaw = localStorage.getItem(legacyKey);
+      if(!legacyRaw) continue;
+      try{
+        const legacyParsed = JSON.parse(legacyRaw);
+        const upgraded = normalizeStore(legacyParsed);
+        localStorage.setItem(STORE_KEY, JSON.stringify(upgraded));
+        return upgraded;
+      }catch{
+        // if legacy parse fails, skip and continue to next
       }
-    };
+    }
+
+    // 3) Nothing found: fresh store
+    const fresh = baseDefaultStore();
+    localStorage.setItem(STORE_KEY, JSON.stringify(fresh));
+    return fresh;
+  }catch{
+    // If anything goes wrong, fall back to fresh
+    const fresh = baseDefaultStore();
+    try{
+      localStorage.setItem(STORE_KEY, JSON.stringify(fresh));
+    }catch{}
+    return fresh;
   }
 }
 
@@ -1456,7 +1490,7 @@ cancelBtn.addEventListener("click", () => {
 });
 
 /*
-  UPDATED: DONE button behavior
+  DONE button behavior
   - not done -> done: save, then collapse panel
   - done -> UNDO: remove, then collapse panel
 */
