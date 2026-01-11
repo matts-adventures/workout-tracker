@@ -1374,19 +1374,25 @@ groupsGrid.addEventListener("click", (e) => {
         showSelectedPanel({
           exercise,
           group: completedData.group || group,
-          sets: (completedData.sets || defaultSets(3)).map(s => ({ reps:s.reps ?? "", weight:s.weight ?? "" }))
+          sets: (completedData.sets || defaultSets(3)).map(s => ({
+            reps: s.reps ?? "",
+            weight: s.weight ?? ""
+          }))
         });
       }
     }else{
       if(isTimedExercise(group, exercise)){
-        showSelectedPanel({ exercise, group, sets:[] });
+        showSelectedPanel({ exercise, group, sets: [] });
       }else{
         const last = findLastCompletedForExercise(exercise, currentDate);
         if(last){
           showSelectedPanel({
             exercise,
             group,
-            sets: (last.data.sets || []).map(s => ({ reps:s.reps ?? "", weight:s.weight ?? "" }))
+            sets: (last.data.sets || []).map(s => ({
+              reps: s.reps ?? "",
+              weight: s.weight ?? ""
+            }))
           });
         }else{
           showSelectedPanel({ exercise, group, sets: defaultSets(3) });
@@ -1396,6 +1402,12 @@ groupsGrid.addEventListener("click", (e) => {
 
     openAddForGroup = null;
     renderExerciseGroups();
+
+    // 🔽 NEW: scroll the selected panel into view, instead of top of page
+    if (selectedWrap) {
+      selectedWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
     return;
   }
 
