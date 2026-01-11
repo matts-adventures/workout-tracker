@@ -1149,16 +1149,33 @@ setsBody.addEventListener("input", (e) => {
   const idx = Number(t.dataset.idx);
   const field = t.dataset.field;
   if(!selected || Number.isNaN(idx) || !field) return;
+
   selected.sets[idx][field] = t.value;
-  saveInProgress(currentDate, { exercise:selected.exercise, group:selected.group, sets:selected.sets, timed:selected.timed });
+
+  saveInProgress(currentDate, {
+    exercise: selected.exercise,
+    group: selected.group,
+    sets: selected.sets,
+    timed: selected.timed
+  });
   markActivity();
   maybeAutoStartWorkout();
+});
+  // Auto-fill sets 2–3 only when you leave Set 1 weight
+setsBody.addEventListener("blur", (e) => {
+  const t = e.target;
+  if(!(t instanceof HTMLInputElement)) return;
 
+  const idx = Number(t.dataset.idx);
+  const field = t.dataset.field;
+
+  if(!selected || Number.isNaN(idx) || !field) return;
+
+  // Only trigger when leaving Set 1's weight field
   if(idx === 0 && field === "weight"){
-    // Debounced-ish auto-fill after first set weight changes
     autoFillFromFirstSet();
   }
-});
+}, true); // use capture so blur bubbles up
 setsBody.addEventListener("click", (e) => {
   const bumpBtn = e.target.closest("button[data-bump]");
   if(bumpBtn && selected && !selected.timed){
