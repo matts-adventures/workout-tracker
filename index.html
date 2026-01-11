@@ -23,7 +23,7 @@
       color:var(--text);
     }
     .wrap{max-width:1200px;margin:0 auto;display:grid;gap:14px}
-    header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+    header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
     h1{margin:0;font-size:20px;letter-spacing:.2px}
     .sub{margin:6px 0 0;color:var(--muted);font-size:13px}
     .pill{
@@ -223,77 +223,6 @@
     }
     .warn strong{color:#ffe7b3}
 
-    /* Custom calendar popover */
-    .date-wrap{ position:relative; }
-    .date-input{ cursor:pointer; }
-
-    .date-popover{
-      position:absolute;
-      top: calc(100% + 8px);
-      left:0;
-      width: 320px;
-      max-width: min(320px, 92vw);
-      border:1px solid var(--border);
-      border-radius:14px;
-      background: rgba(0,0,0,.55);
-      backdrop-filter: blur(10px);
-      box-shadow:0 18px 40px rgba(0,0,0,.45);
-      padding:10px;
-      z-index: 50;
-      display:none;
-    }
-    .date-popover.open{ display:block; }
-    .cal-head{
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:10px;
-      margin-bottom:8px;
-    }
-    .cal-title{
-      font-size:12px;
-      color:var(--text);
-      font-weight:650;
-      letter-spacing:.2px;
-    }
-    .cal-nav{ display:flex; gap:8px; }
-    .cal-grid{
-      display:grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap:6px;
-    }
-    .cal-dow{
-      font-size:11px;
-      color:var(--muted);
-      text-align:center;
-      padding:6px 0;
-      user-select:none;
-    }
-    .cal-day{
-      border:1px solid var(--border);
-      background: rgba(255,255,255,.05);
-      border-radius:12px;
-      padding:8px 0;
-      font-size:12px;
-      text-align:center;
-      cursor:pointer;
-      user-select:none;
-    }
-    .cal-day:hover{ background: rgba(255,255,255,.09); }
-    .cal-day.muted{
-      opacity:.35;
-      cursor:default;
-    }
-    .cal-day.disabled{
-      opacity:.25;
-      cursor:not-allowed;
-    }
-    .cal-day.today{ border-color: rgba(121,255,168,.35); }
-    .cal-day.selected{
-      border-color: rgba(93,214,255,.65);
-      background: rgba(93,214,255,.12);
-    }
-
     /* Header controls */
     .head-right{display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; justify-content:flex-end}
     .head-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end}
@@ -333,7 +262,6 @@
       input, select{ padding:12px; border-radius:14px; }
       .search{ max-width:100%; }
       .two-col{ gap:12px; }
-      .date-popover{ width: min(360px, 92vw); }
 
       .selected-wrap{
         position: sticky;
@@ -385,7 +313,7 @@
     <header>
       <div>
         <h1>Workout Tracker</h1>
-        <p class="sub">Pick an exercise → log sets (or time) → DONE. Completed exercises turn green. Badges show the last completed date. Long-press an exercise to hide it.</p>
+        <p class="sub">Pick an exercise → log sets (or time) → DONE. Completed exercises turn green. Badges show the last completed date.</p>
       </div>
 
       <!-- Desktop / tablet header -->
@@ -398,7 +326,7 @@
         </div>
       </div>
 
-      <!-- Mobile-only header (requested layout) -->
+      <!-- Mobile-only header -->
       <div class="head-stack" aria-label="Mobile header controls">
         <div class="head-stack-row">
           <div class="pill" id="yearCountPillMobile">—</div>
@@ -417,10 +345,9 @@
         <h2>Workouts</h2>
 
         <div class="row">
-          <div style="flex:1; min-width:220px;" class="date-wrap">
+          <div style="flex:1; min-width:220px;">
             <label for="datePicker">Date</label>
-            <input id="datePicker" class="date-input" type="text" inputmode="none" readonly />
-            <div id="datePopover" class="date-popover" aria-hidden="true"></div>
+            <input id="datePicker" type="date" />
           </div>
           <div style="display:flex;flex-direction:column;gap:6px;min-width:140px;">
             <div class="mini" id="sessionStatus">—</div>
@@ -501,7 +428,7 @@
         <div class="groups2" id="groupsGrid"></div>
 
         <div class="mini" style="margin-top:10px;">
-          Tip: use the <strong>+</strong> at the bottom of any body-part group to add an exercise permanently. Long-press any exercise to hide it.
+          Tip: use the <strong>+</strong> at the bottom of any body-part group to add an exercise permanently.
         </div>
       </section>
 
@@ -542,17 +469,22 @@
 
 <script>
 /* ===========================
-   Store + migration
+   Store + version
    =========================== */
 const STORE_KEY = "workout_tracker_session_checklist_v4";
-const LEGACY_KEYS = ["workout_tracker_session_checklist_v3"];
 
 const norm = (s) => String(s ?? "").trim().replace(/\s+/g, " ");
 const todayISO = () => {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  return [
+    d.getFullYear(),
+    String(d.getMonth()+1).padStart(2,"0"),
+    String(d.getDate()).padStart(2,"0")
+  ].join("-");
 };
+const isToday = (iso) => iso === todayISO();
 
+/* Base store shape includes workout + UI (filters + lastActivity) */
 function baseDefaultStore(){
   return {
     version: 4,
@@ -560,7 +492,7 @@ function baseDefaultStore(){
     sessions: {},
     ui: {
       filters: { upper:false, lower:false, core:false, cardio:false },
-      hiddenExercises: []
+      lastActivityAt: null
     }
   };
 }
@@ -572,21 +504,18 @@ function normalizeStore(parsedRaw){
   parsed.sessions ??= {};
   parsed.ui ??= {};
   parsed.ui.filters ??= { upper:false, lower:false, core:false, cardio:false };
-  parsed.ui.hiddenExercises ??= [];
+  parsed.ui.lastActivityAt ??= null;
 
-  for(const k of ["upper","lower","core","cardio"]){
-    parsed.ui.filters[k] = Boolean(parsed.ui.filters[k]);
-  }
-  if(!Array.isArray(parsed.ui.hiddenExercises)){
-    parsed.ui.hiddenExercises = [];
+  for(const key of ["upper","lower","core","cardio"]){
+    parsed.ui.filters[key] = Boolean(parsed.ui.filters[key]);
   }
 
   for(const [date, s] of Object.entries(parsed.sessions)){
     s.completed ??= {};
     s.inProgress ??= null;
-    s.workout ??= { startedAt: null, endedAt: null };
-    s.workout.startedAt ??= null;
-    s.workout.endedAt ??= null;
+    s.workout ??= { startedAt:null, endedAt:null };
+    if(s.workout.startedAt === undefined) s.workout.startedAt = null;
+    if(s.workout.endedAt === undefined) s.workout.endedAt = null;
   }
 
   parsed.version = 4;
@@ -595,46 +524,25 @@ function normalizeStore(parsedRaw){
 
 function loadStore(){
   try{
-    // 1) Try primary key (v4)
     const raw = localStorage.getItem(STORE_KEY);
-    if(raw){
-      const parsed = JSON.parse(raw);
-      return normalizeStore(parsed);
-    }
-
-    // 2) Try legacy keys (e.g., v3)
-    for(const legacyKey of LEGACY_KEYS){
-      const legacyRaw = localStorage.getItem(legacyKey);
-      if(!legacyRaw) continue;
-      try{
-        const legacyParsed = JSON.parse(legacyRaw);
-        const upgraded = normalizeStore(legacyParsed);
-        localStorage.setItem(STORE_KEY, JSON.stringify(upgraded));
-        return upgraded;
-      }catch{
-        // if legacy parse fails, skip and continue to next
-      }
-    }
-
-    // 3) Nothing found: fresh store
-    const fresh = baseDefaultStore();
-    localStorage.setItem(STORE_KEY, JSON.stringify(fresh));
-    return fresh;
-  }catch{
-    // If anything goes wrong, fall back to fresh
-    const fresh = baseDefaultStore();
-    try{
+    if(!raw){
+      const fresh = baseDefaultStore();
       localStorage.setItem(STORE_KEY, JSON.stringify(fresh));
-    }catch{}
+      return fresh;
+    }
+    const parsed = JSON.parse(raw);
+    return normalizeStore(parsed);
+  }catch{
+    const fresh = baseDefaultStore();
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(fresh)); }catch{}
     return fresh;
   }
 }
-
 let store = loadStore();
 function saveStore(){ localStorage.setItem(STORE_KEY, JSON.stringify(store)); }
 
 /* ===========================
-   Exercises
+   Data: exercises + filters
    =========================== */
 const BASE_GROUPS = [
   { group: "Back", items: ["Lat pull down","Row","Chin Up","Back Raise"] },
@@ -660,72 +568,34 @@ const PAIRS = [
   ["Cardio",""]
 ];
 
-/* ===========================
-   Filters
-   =========================== */
 const FILTER_TO_GROUPS = {
   upper: ["Back","Chest","Shoulders","Arms"],
   lower: ["Legs","Glutes/Hips","Calves"],
   core:  ["Core"],
   cardio:["Cardio"]
 };
-const GROUP_TO_FILTER = Object.freeze({
+const GROUP_TO_FILTER = {
   "Back":"upper","Chest":"upper","Shoulders":"upper","Arms":"upper",
   "Legs":"lower","Glutes/Hips":"lower","Calves":"lower",
   "Core":"core","Cardio":"cardio"
-});
-function anyFiltersOn(){
-  const f = store.ui?.filters || {};
-  return Boolean(f.upper || f.lower || f.core || f.cardio);
-}
-function getAllowedGroups(){
-  if(!anyFiltersOn()) return new Set(GROUP_ORDER);
-  const allowed = new Set();
-  const f = store.ui.filters;
-  for(const key of ["upper","lower","core","cardio"]){
-    if(!f[key]) continue;
-    for(const g of (FILTER_TO_GROUPS[key] || [])) allowed.add(g);
-  }
-  return allowed;
-}
-function ensureFiltersIncludeGroup(groupName){
-  if(!anyFiltersOn()) return;
-  const filterKey = GROUP_TO_FILTER[groupName];
-  if(!filterKey) return;
-  const allowed = getAllowedGroups();
-  if(allowed.has(groupName)) return;
-  store.ui.filters[filterKey] = true;
-  saveStore();
-  renderFilterButtons();
-}
-function renderFilterButtons(){
-  const f = store.ui.filters;
-  const map = {
-    upper: document.getElementById("filterUpper"),
-    lower: document.getElementById("filterLower"),
-    core: document.getElementById("filterCore"),
-    cardio: document.getElementById("filterCardio")
-  };
-  for(const key of Object.keys(map)){
-    const btn = map[key];
-    const on = Boolean(f[key]);
-    btn.classList.toggle("filter-on", on);
-    btn.setAttribute("aria-pressed", on ? "true" : "false");
-  }
-}
+};
 
 /* ===========================
-   DOM
+   DOM refs
    =========================== */
 const datePicker = document.getElementById("datePicker");
-const datePopover = document.getElementById("datePopover");
-
 const sessionStatus = document.getElementById("sessionStatus");
 const clearDayBtn = document.getElementById("clearDayBtn");
+const futureWarn = document.getElementById("futureWarn");
+
 const completedPill = document.getElementById("completedPill");
 const totalPill = document.getElementById("totalPill");
 const groupsGrid = document.getElementById("groupsGrid");
-const futureWarn = document.getElementById("futureWarn");
+
+const filterUpper = document.getElementById("filterUpper");
+const filterLower = document.getElementById("filterLower");
+const filterCore = document.getElementById("filterCore");
+const filterCardio = document.getElementById("filterCardio");
 
 const selectedWrap = document.getElementById("selectedWrap");
 const selectedName = document.getElementById("selectedName");
@@ -736,7 +606,6 @@ const clearSetsBtn = document.getElementById("clearSetsBtn");
 const doneBtn = document.getElementById("doneBtn");
 const cancelBtn = document.getElementById("cancelBtn");
 const selectedHint = document.getElementById("selectedHint");
-
 const liftPanel = document.getElementById("liftPanel");
 const timedPanel = document.getElementById("timedPanel");
 const timedMinutes = document.getElementById("timedMinutes");
@@ -746,33 +615,39 @@ const timedTimerPill = document.getElementById("timedTimerPill");
 
 const todaySummary = document.getElementById("todaySummary");
 const todayList = document.getElementById("todayList");
+
 const exportCsvBtn = document.getElementById("exportCsvBtn");
 
 const historyWrap = document.getElementById("historyWrap");
 const historySearch = document.getElementById("historySearch");
 const historyDateFilter = document.getElementById("historyDateFilter");
 
+const yearCountPill = document.getElementById("yearCountPill");
+const yearCountPillMobile = document.getElementById("yearCountPillMobile");
 const startWorkoutBtn = document.getElementById("startWorkoutBtn");
 const endWorkoutBtn = document.getElementById("endWorkoutBtn");
 const workoutTimerPill = document.getElementById("workoutTimerPill");
-const yearCountPill = document.getElementById("yearCountPill");
-
 const startWorkoutBtnMobile = document.getElementById("startWorkoutBtnMobile");
 const endWorkoutBtnMobile = document.getElementById("endWorkoutBtnMobile");
 const workoutTimerPillMobile = document.getElementById("workoutTimerPillMobile");
-const yearCountPillMobile = document.getElementById("yearCountPillMobile");
 
 /* ===========================
    State
    =========================== */
 let currentDate = todayISO();
 let lastValidDate = currentDate;
-let historySelectedDate = null;
+let historySelectedDate = currentDate;
 let selected = null;
 let openAddForGroup = null;
 
-// Per-exercise timed timer state
-let timedTimer = { running:false, startedAtMs:null, tickId:null };
+/* Per-exercise timer (for timed exercises) */
+let timedTimerInterval = null;
+let timedStartTime = null;
+
+/* Global workout timer + inactivity */
+let workoutTimerInterval = null;
+const INACTIVITY_LIMIT_MS = 15 * 60 * 1000;
+const INACTIVITY_CHECK_MS = 10 * 1000;
 
 /* ===========================
    Helpers
@@ -790,62 +665,18 @@ function escapeAttr(str){
     .replaceAll("<","&lt;")
     .replaceAll(">","&gt;");
 }
-function pad2(n){ return String(n).padStart(2,"0"); }
-function formatMMSS(totalSeconds){
-  const s = Math.max(0, Math.floor(totalSeconds));
-  const mm = Math.floor(s / 60);
-  const ss = s % 60;
-  return `${mm}:${pad2(ss)}`;
-}
-function extractNumberMaybe(text){
-  const s = String(text ?? "");
-  const m = s.match(/-?\d*\.?\d+/);
-  if(!m) return 0;
-  const n = Number(m[0]);
-  return Number.isFinite(n) ? n : 0;
-}
-function formatNumberSmart(n){
-  if(Number.isInteger(n)) return String(n);
-  return String(Math.round(n * 1000) / 1000);
-}
-function formatMDYY(isoDateStr){
-  const [y, m, d] = String(isoDateStr).split("-").map(Number);
-  if(!y || !m || !d) return "";
-  const dt = new Date(y, m - 1, d, 12, 0, 0);
-  const mm = dt.getMonth() + 1;
-  const dd = dt.getDate();
-  const yy = String(dt.getFullYear()).slice(-2);
-  return `${mm}/${dd}/${yy}`;
-}
-
-function isTimedExercise(exerciseName, groupName){
-  const ex = norm(exerciseName).toLowerCase();
-  const grp = norm(groupName).toLowerCase();
-  if(grp === "cardio") return true;
-  if(ex === "plank") return true;
-  return false;
-}
-
-function normalizeSetObj(s){
-  return {
-    reps: s?.reps ?? "",
-    weight: s?.weight ?? "",
-    autoReps: Boolean(s?.autoReps),
-    autoWeight: Boolean(s?.autoWeight),
-  };
-}
 function defaultSets(n=3){
-  return Array.from({length:n}, () => normalizeSetObj({ reps:"", weight:"", autoReps:false, autoWeight:false }));
+  return Array.from({length:n}, () => ({ reps:"", weight:"" }));
 }
-
 function getSession(date){
-  store.sessions[date] ??= { completed: {}, inProgress: null, workout: { startedAt: null, endedAt: null } };
-  store.sessions[date].completed ??= {};
-  store.sessions[date].inProgress ??= null;
-  store.sessions[date].workout ??= { startedAt: null, endedAt: null };
-  store.sessions[date].workout.startedAt ??= null;
-  store.sessions[date].workout.endedAt ??= null;
-  return store.sessions[date];
+  store.sessions[date] ??= { completed:{}, inProgress:null, workout:{ startedAt:null, endedAt:null } };
+  const s = store.sessions[date];
+  s.completed ??= {};
+  s.inProgress ??= null;
+  s.workout ??= { startedAt:null, endedAt:null };
+  if(s.workout.startedAt === undefined) s.workout.startedAt = null;
+  if(s.workout.endedAt === undefined) s.workout.endedAt = null;
+  return s;
 }
 function saveInProgress(date, payload){
   const s = getSession(date);
@@ -871,67 +702,112 @@ function clearDay(date){
   delete store.sessions[date];
   saveStore();
 }
+function cssEscape(str){ return String(str).replaceAll(`"`,`\\"`); }
 
+/* Number formatting */
+function formatDuration(ms){
+  ms = Math.max(0, ms|0);
+  const totalSec = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec % 60;
+  return `${minutes}:${String(seconds).padStart(2,"0")}`;
+}
+
+/* ===========================
+   Filters
+   =========================== */
+function anyFiltersOn(){
+  const f = store.ui.filters;
+  return f.upper || f.lower || f.core || f.cardio;
+}
+function getAllowedGroups(){
+  if(!anyFiltersOn()) return new Set(GROUP_ORDER);
+  const allowed = new Set();
+  const f = store.ui.filters;
+  for(const key of ["upper","lower","core","cardio"]){
+    if(!f[key]) continue;
+    for(const g of (FILTER_TO_GROUPS[key] || [])) allowed.add(g);
+  }
+  return allowed;
+}
+function renderFilterButtons(){
+  const f = store.ui.filters;
+  const map = {
+    upper: filterUpper,
+    lower: filterLower,
+    core: filterCore,
+    cardio: filterCardio
+  };
+  for(const key of Object.keys(map)){
+    const btn = map[key];
+    const on = Boolean(f[key]);
+    btn.classList.toggle("filter-on", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+}
+function toggleFilter(key){
+  const f = store.ui.filters;
+  f[key] = !f[key];
+  saveStore();
+  markActivity();
+  maybeAutoStartWorkout();
+  renderFilterButtons();
+  renderExerciseGroups();
+}
+
+/* Ensure selected group visible when filters already on */
+function ensureFiltersIncludeGroup(groupName){
+  if(!anyFiltersOn()) return;
+  const filterKey = GROUP_TO_FILTER[groupName];
+  if(!filterKey) return;
+  const allowed = getAllowedGroups();
+  if(allowed.has(groupName)) return;
+  store.ui.filters[filterKey] = true;
+  saveStore();
+  renderFilterButtons();
+}
+
+/* ===========================
+   Future-date restriction
+   =========================== */
+function isFutureDate(iso){
+  if(!iso) return false;
+  return iso > todayISO();
+}
 function showFutureWarning(show){
   futureWarn.style.display = show ? "block" : "none";
 }
 function enforceDateNotFuture(proposedDate){
   const t = todayISO();
-  if(!proposedDate) return { ok: true, date: currentDate };
+  datePicker.max = t;
+
+  if(!proposedDate) return { ok:true, date: currentDate };
+
   if(proposedDate > t){
     showFutureWarning(true);
     const fallback = lastValidDate && lastValidDate <= t ? lastValidDate : t;
     datePicker.value = fallback;
-    return { ok: false, date: fallback };
+    return { ok:false, date:fallback };
   }
   showFutureWarning(false);
-  return { ok: true, date: proposedDate };
+  return { ok:true, date:proposedDate };
 }
 
 /* ===========================
-   Hidden exercises (long press)
+   Date formatting: M/D/YY
    =========================== */
-function makeHiddenKey(group, exercise){
-  return `${norm(group)}::${norm(exercise)}`;
+function formatMDYY(isoDateStr){
+  const [y,m,d] = String(isoDateStr).split("-").map(Number);
+  if(!y || !m || !d) return "";
+  const dt = new Date(y, m-1, d, 12,0,0);
+  const mm = dt.getMonth()+1;
+  const dd = dt.getDate();
+  const yy = String(dt.getFullYear()).slice(-2);
+  return `${mm}/${dd}/${yy}`;
 }
-function hiddenSet(){
-  return new Set((store.ui.hiddenExercises || []).map(norm));
-}
-function hideExercise(group, exercise){
-  const key = makeHiddenKey(group, exercise);
-  const set = hiddenSet();
-  if(set.has(key)) return;
-  store.ui.hiddenExercises.push(key);
-  saveStore();
-}
-function buildGroupedExercises(){
-  const grouped = new Map();
-  const hidden = hiddenSet();
-
-  for(const g of BASE_GROUPS){
-    const groupName = norm(g.group);
-    const items = g.items.map(norm).filter(ex => !hidden.has(makeHiddenKey(groupName, ex)));
-    grouped.set(groupName, items);
-  }
-  for(const c of (store.customExercises || [])){
-    const group = norm(c.group);
-    const name = norm(c.name);
-    if(!group || !name) continue;
-    if(hidden.has(makeHiddenKey(group, name))) continue;
-    if(!grouped.has(group)) grouped.set(group, []);
-    const arr = grouped.get(group);
-    if(!arr.includes(name)) arr.push(name);
-  }
-  for(const g of GROUP_ORDER){
-    if(!grouped.has(g)) grouped.set(g, []);
-    grouped.get(g).sort((a,b)=>a.localeCompare(b));
-  }
-  return grouped;
-}
-function cssEscape(str){ return String(str).replaceAll(`"`, `\\"`); }
 
 /* ===========================
-   Previous workout shading + last completed
+   Previous workout shading
    =========================== */
 function findPreviousWorkoutDate(beforeDate){
   const dates = Object.keys(store.sessions || {})
@@ -949,6 +825,10 @@ function getPrevWorkoutCompletedSet(beforeDate){
   const completed = store.sessions[prev]?.completed || {};
   return new Set(Object.keys(completed).map(norm));
 }
+
+/* ===========================
+   Last completed date per exercise
+   =========================== */
 function findLastCompletedDateForExercise(exerciseName, beforeDate){
   const dates = Object.keys(store.sessions || {})
     .filter(d => d < beforeDate)
@@ -959,608 +839,452 @@ function findLastCompletedDateForExercise(exerciseName, beforeDate){
   }
   return null;
 }
+
+/* Auto-fill sets from last completed */
 function findLastCompletedForExercise(exerciseName, beforeDate){
   const dates = Object.keys(store.sessions || {})
     .filter(d => d < beforeDate)
     .sort((a,b)=>b.localeCompare(a));
   for(const d of dates){
     const data = store.sessions[d]?.completed?.[exerciseName];
-    if(data) return { date: d, data };
+    if(data && Array.isArray(data.sets)) return { date:d, data };
   }
   return null;
 }
 
 /* ===========================
-   Workout start/end + year count
+   Activity + workout timer
    =========================== */
-function countWorkoutsThisYear(){
-  const y = new Date().getFullYear();
-  let count = 0;
-  for(const [date, s] of Object.entries(store.sessions || {})){
-    if(!date.startsWith(String(y) + "-")) continue;
-    const endedAt = s?.workout?.endedAt;
-    if(endedAt) count += 1;
-  }
-  return count;
-}
-function updateHeaderWorkoutUI(){
-  const session = getSession(currentDate);
-  const w = session.workout || { startedAt:null, endedAt:null };
-  const started = Boolean(w.startedAt);
-  const ended = Boolean(w.endedAt);
-
-  startWorkoutBtn.disabled = started;
-  endWorkoutBtn.disabled = !started || ended;
-  startWorkoutBtnMobile.disabled = started;
-  endWorkoutBtnMobile.disabled = !started || ended;
-
-  const yearCount = countWorkoutsThisYear();
-  yearCountPill.textContent = `${new Date().getFullYear()} workouts: ${yearCount}`;
-  yearCountPillMobile.textContent = `${new Date().getFullYear()} workouts: ${yearCount}`;
-}
-function startWorkout(){
-  const session = getSession(currentDate);
-  const w = session.workout;
-  if(w.startedAt) return;
-  w.startedAt = new Date().toISOString();
-  w.endedAt = null;
+function markActivity(){
+  store.ui.lastActivityAt = new Date().toISOString();
   saveStore();
-  updateHeaderWorkoutUI();
 }
-function endWorkout(){
-  const session = getSession(currentDate);
-  const w = session.workout;
-  if(!w.startedAt || w.endedAt) return;
-  w.endedAt = new Date().toISOString();
+
+/* Start workout (manual or auto) – today only, not ended yet */
+function startWorkoutIfPossible(){
+  if(!isToday(currentDate)) return;
+  const s = getSession(currentDate);
+  if(s.workout.startedAt || s.workout.endedAt) return; // already started or locked
+
+  const nowIso = new Date().toISOString();
+  s.workout.startedAt = nowIso;
+  s.workout.endedAt = null;
+  store.ui.lastActivityAt = nowIso;
   saveStore();
-  stopTimedTimer(false);
-  hideSelectedPanel();
-  updateHeaderWorkoutUI();
-  renderAll();
+  updateWorkoutButtons();
+  startWorkoutTimerLoop();
 }
-startWorkoutBtn.addEventListener("click", startWorkout);
-endWorkoutBtn.addEventListener("click", () => {
-  if(!confirm("End workout?")) return;
-  endWorkout();
-});
-startWorkoutBtnMobile.addEventListener("click", startWorkout);
-endWorkoutBtnMobile.addEventListener("click", () => {
-  if(!confirm("End workout?")) return;
-  endWorkout();
-});
 
-function tickWorkoutTimer(){
-  const session = getSession(currentDate);
-  const w = session.workout || { startedAt:null, endedAt:null };
+/* maybeAutoStartWorkout: only for today's workout, never if already started/ended */
+function maybeAutoStartWorkout(){
+  if(!isToday(currentDate)) return;
+  const s = getSession(currentDate);
+  if(s.workout.startedAt || s.workout.endedAt) return;
+  // silent auto-start
+  startWorkoutIfPossible();
+}
 
-  if(!w.startedAt){
-    workoutTimerPill.textContent = "Workout: —";
-    workoutTimerPillMobile.textContent = "Workout: —";
-    return;
+/* End workout (manual or inactivity) */
+function endWorkoutIfRunning({ auto=false, inactivityEndMs=null } = {}){
+  const s = getSession(currentDate);
+  if(!s.workout.startedAt || s.workout.endedAt) return; // nothing to end / already locked
+
+  let endTime;
+  if(auto && inactivityEndMs != null){
+    endTime = new Date(inactivityEndMs);
+  }else{
+    endTime = new Date();
   }
+  s.workout.endedAt = endTime.toISOString();
+  saveStore();
+  updateWorkoutButtons();
+  stopWorkoutTimerLoop();
+  renderWorkoutTimerPills(); // show final duration
+}
 
-  const startMs = Date.parse(w.startedAt);
-  const endMs = w.endedAt ? Date.parse(w.endedAt) : Date.now();
-  if(!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs){
-    workoutTimerPill.textContent = "Workout: —";
-    workoutTimerPillMobile.textContent = "Workout: —";
-    return;
+/* Timer loop + display */
+function getWorkoutElapsedMsForDate(date){
+  const s = getSession(date);
+  if(!s.workout.startedAt) return 0;
+  const startMs = Date.parse(s.workout.startedAt);
+  if(!startMs || Number.isNaN(startMs)) return 0;
+
+  if(s.workout.endedAt){
+    const endMs = Date.parse(s.workout.endedAt);
+    if(!endMs || Number.isNaN(endMs)) return 0;
+    return Math.max(0, endMs - startMs);
+  }else{
+    // still active
+    const nowMs = Date.now();
+    return Math.max(0, nowMs - startMs);
   }
+}
 
-  const elapsedSec = Math.floor((endMs - startMs) / 1000);
-  const text = `Workout: ${formatMMSS(elapsedSec)}`;
+function renderWorkoutTimerPills(){
+  const s = getSession(currentDate);
+  let text = "Workout: —";
+  if(s.workout.startedAt){
+    const ms = getWorkoutElapsedMsForDate(currentDate);
+    text = "Workout: " + formatDuration(ms);
+  }
   workoutTimerPill.textContent = text;
   workoutTimerPillMobile.textContent = text;
 }
 
-/* ===========================
-   Per-exercise timer (timed activities)
-   =========================== */
-function renderTimedTimerPill(){
-  if(!timedTimer.running){
-    if(!/Timer:/.test(timedTimerPill.textContent)) timedTimerPill.textContent = "Timer: —";
-    return;
-  }
-  const elapsedSec = Math.floor((Date.now() - timedTimer.startedAtMs) / 1000);
-  timedTimerPill.textContent = `Timer: ${formatMMSS(elapsedSec)}`;
+function startWorkoutTimerLoop(){
+  if(workoutTimerInterval != null) return;
+  workoutTimerInterval = setInterval(() => {
+    renderWorkoutTimerPills();
+  }, 1000);
+  renderWorkoutTimerPills();
 }
-function startTimedTimer(){
-  if(timedTimer.running) return;
-  timedTimer.running = true;
-  timedTimer.startedAtMs = Date.now();
-  timedStartBtn.disabled = true;
-  timedStopBtn.disabled = false;
-  timedTimerPill.textContent = "Timer: 0:00";
-  if(timedTimer.tickId) clearInterval(timedTimer.tickId);
-  timedTimer.tickId = setInterval(renderTimedTimerPill, 250);
-}
-function stopTimedTimer(autofill){
-  if(!timedTimer.running) return;
-  const elapsedSec = Math.max(0, Math.floor((Date.now() - timedTimer.startedAtMs) / 1000));
-
-  timedTimer.running = false;
-  if(timedTimer.tickId) clearInterval(timedTimer.tickId);
-  timedTimer.tickId = null;
-  timedTimer.startedAtMs = null;
-
-  timedStartBtn.disabled = false;
-  timedStopBtn.disabled = true;
-  timedTimerPill.textContent = `Timer: ${formatMMSS(elapsedSec)}`;
-
-  if(autofill && selected && selected.mode === "timed"){
-    const minutes = Math.round((elapsedSec / 60) * 100) / 100;
-    selected.minutes = formatNumberSmart(minutes);
-    timedMinutes.value = selected.minutes;
-    saveInProgress(currentDate, { exercise: selected.exercise, group: selected.group, mode: "timed", minutes: selected.minutes });
+function stopWorkoutTimerLoop(){
+  if(workoutTimerInterval != null){
+    clearInterval(workoutTimerInterval);
+    workoutTimerInterval = null;
   }
 }
-timedStartBtn.addEventListener("click", startTimedTimer);
-timedStopBtn.addEventListener("click", () => stopTimedTimer(true));
-timedStopBtn.disabled = true;
 
-/* ===========================
-   Custom Calendar
-   =========================== */
-const DOW = ["Su","Mo","Tu","We","Th","Fr","Sa"];
-const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-let calView = { year: Number(todayISO().slice(0,4)), month: Number(todayISO().slice(5,7)) - 1 };
-
-function isoFromYMD(y,m,d){
-  return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-}
-function clampCalViewToToday(){
-  const t = todayISO();
-  const ty = Number(t.slice(0,4));
-  const tm = Number(t.slice(5,7)) - 1;
-  if(calView.year > ty || (calView.year === ty && calView.month > tm)){
-    calView.year = ty; calView.month = tm;
-  }
-}
-function openCalendar(){
-  const [y,m] = currentDate.split("-").map(Number);
-  if(y && m){
-    calView.year = y;
-    calView.month = m - 1;
-  }
-  clampCalViewToToday();
-  renderCalendar();
-  datePopover.classList.add("open");
-  datePopover.setAttribute("aria-hidden","false");
-}
-function closeCalendar(){
-  datePopover.classList.remove("open");
-  datePopover.setAttribute("aria-hidden","true");
-}
-function renderCalendar(){
-  clampCalViewToToday();
-  const y = calView.year;
-  const m = calView.month;
-
-  const first = new Date(y, m, 1);
-  const startDow = first.getDay();
-  const daysInMonth = new Date(y, m+1, 0).getDate();
-
-  const t = todayISO();
-  const ty = Number(t.slice(0,4));
-  const tm = Number(t.slice(5,7)) - 1;
-  const td = Number(t.slice(8,10));
-
-  const isTodayMonth = (y === ty && m === tm);
-  const nextDisabled = isTodayMonth;
-
-  const head = `
-    <div class="cal-head">
-      <div class="cal-title">${MONTHS[m]} ${y}</div>
-      <div class="cal-nav">
-        <button class="btn small ghost" type="button" data-cal="prev">◀</button>
-        <button class="btn small ghost" type="button" data-cal="next" ${nextDisabled ? "disabled" : ""}>▶</button>
-      </div>
-    </div>
-  `;
-
-  const dows = DOW.map(d => `<div class="cal-dow">${d}</div>`).join("");
-
-  let cells = "";
-  for(let i=0;i<startDow;i++){
-    cells += `<div class="cal-day muted" aria-hidden="true"> </div>`;
-  }
-
-  for(let day=1; day<=daysInMonth; day++){
-    const iso = isoFromYMD(y,m,day);
-    const isFuture = (y > ty) || (y === ty && (m > tm || (m === tm && day > td)));
-    const cls = [
-      "cal-day",
-      isFuture ? "disabled" : "",
-      iso === t ? "today" : "",
-      iso === currentDate ? "selected" : ""
-    ].join(" ").trim();
-
-    cells += `
-      <div class="${cls}" data-cal-day="${iso}" ${isFuture ? 'aria-disabled="true"' : ""}>
-        ${day}
-      </div>
-    `;
-  }
-
-  datePopover.innerHTML = `
-    ${head}
-    <div class="cal-grid" role="grid" aria-label="Calendar">
-      ${dows}
-      ${cells}
-    </div>
-    <div class="mini" style="margin-top:8px;">Max date: <span class="mono">${todayISO()}</span></div>
-  `;
-}
-
-function applyDateChange(proposedIso){
-  const res = enforceDateNotFuture(proposedIso);
-  if(!res.ok) return;
-
-  currentDate = res.date;
-  lastValidDate = currentDate;
-  openAddForGroup = null;
-  datePicker.value = currentDate;
-
-  stopTimedTimer(false);
-
-  const session = getSession(currentDate);
-  if(session.inProgress && session.inProgress.exercise){
-    showSelectedPanel({
-      exercise: session.inProgress.exercise,
-      group: session.inProgress.group,
-      mode: session.inProgress.mode,
-      sets: session.inProgress.sets,
-      minutes: session.inProgress.minutes
-    });
-  } else {
-    hideSelectedPanel();
-  }
-
-  historySelectedDate = currentDate;
-  updateHeaderWorkoutUI();
-  renderAll();
-}
-
-datePicker.addEventListener("click", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  openCalendar();
-});
-datePicker.addEventListener("keydown", (e) => {
-  if(e.key === "Enter" || e.key === " "){
-    e.preventDefault();
-    openCalendar();
-  }
-});
-datePopover.addEventListener("click", (e) => {
-  const prev = e.target.closest("[data-cal='prev']");
-  const next = e.target.closest("[data-cal='next']");
-  const day = e.target.closest("[data-cal-day]");
-
-  if(prev){
-    calView.month -= 1;
-    if(calView.month < 0){ calView.month = 11; calView.year -= 1; }
-    renderCalendar();
-    return;
-  }
-  if(next){
-    if(next.hasAttribute("disabled")) return;
-    calView.month += 1;
-    if(calView.month > 11){ calView.month = 0; calView.year += 1; }
-    clampCalViewToToday();
-    renderCalendar();
-    return;
-  }
-  if(day){
-    if(day.classList.contains("disabled")) return;
-    const iso = day.dataset.calDay;
-    closeCalendar();
-    applyDateChange(iso);
-    return;
-  }
-});
-document.addEventListener("click", (e) => {
-  if(datePopover.classList.contains("open")){
-    const wrap = datePicker.closest(".date-wrap");
-    if(wrap && !wrap.contains(e.target)){
-      closeCalendar();
+/* On load, reconcile inactivity and restart timer if needed */
+function reconcileWorkoutOnLoad(){
+  const today = todayISO();
+  const sToday = getSession(today);
+  if(sToday.workout.startedAt && !sToday.workout.endedAt){
+    const lastActMs = store.ui.lastActivityAt ? Date.parse(store.ui.lastActivityAt) : null;
+    if(lastActMs){
+      const cutoff = lastActMs + INACTIVITY_LIMIT_MS;
+      const nowMs = Date.now();
+      if(nowMs >= cutoff){
+        // auto-end at cutoff
+        sToday.workout.endedAt = new Date(cutoff).toISOString();
+        saveStore();
+      }
     }
   }
-});
+
+  // Start timer loop if today's workout is still active
+  if(isToday(currentDate)){
+    const s = getSession(currentDate);
+    if(s.workout.startedAt && !s.workout.endedAt){
+      startWorkoutTimerLoop();
+    }
+  }
+  renderWorkoutTimerPills();
+  updateWorkoutButtons();
+}
+
+/* Inactivity checker (runs regardless of date view, but only acts on today) */
+setInterval(() => {
+  const today = todayISO();
+  const s = getSession(today);
+  if(!s.workout.startedAt || s.workout.endedAt) return; // no active workout
+
+  const lastActMs = store.ui.lastActivityAt ? Date.parse(store.ui.lastActivityAt) : null;
+  if(!lastActMs || Number.isNaN(lastActMs)) return;
+
+  const cutoff = lastActMs + INACTIVITY_LIMIT_MS;
+  const nowMs = Date.now();
+  if(nowMs >= cutoff){
+    // End today's workout at cutoff
+    const prevCurrent = currentDate;
+    currentDate = today; // ensure end applies to today session
+    endWorkoutIfRunning({ auto:true, inactivityEndMs:cutoff });
+    currentDate = prevCurrent;
+    // timer & pills updated inside endWorkoutIfRunning
+  }
+}, INACTIVITY_CHECK_MS);
+
+/* Update Start/End buttons based on session + date */
+function updateWorkoutButtons(){
+  const s = getSession(currentDate);
+  const isTod = isToday(currentDate);
+
+  const started = !!s.workout.startedAt;
+  const ended = !!s.workout.endedAt;
+
+  // Only today can start manually
+  const canStart = isTod && !started && !ended;
+  const canEnd = isTod && started && !ended;
+
+  startWorkoutBtn.disabled = !canStart;
+  startWorkoutBtnMobile.disabled = !canStart;
+  endWorkoutBtn.disabled = !canEnd;
+  endWorkoutBtnMobile.disabled = !canEnd;
+}
 
 /* ===========================
-   Selected panel + DONE toggle + Clear sets un-done
+   Per-exercise timed timer
    =========================== */
-function isCompletedToday(exercise){
-  const s = getSession(currentDate);
-  return Boolean(s.completed?.[exercise]);
+function resetTimedTimer(){
+  if(timedTimerInterval != null){
+    clearInterval(timedTimerInterval);
+    timedTimerInterval = null;
+  }
+  timedStartTime = null;
+  timedTimerPill.textContent = "Timer: —";
 }
-function updateDoneButtonLabel(){
-  if(!selected) return;
-  doneBtn.textContent = isCompletedToday(selected.exercise) ? "UNDO" : "DONE";
+function startTimedTimer(){
+  resetTimedTimer();
+  timedStartTime = Date.now();
+  timedTimerInterval = setInterval(() => {
+    const ms = Date.now() - timedStartTime;
+    timedTimerPill.textContent = "Timer: " + formatDuration(ms);
+  }, 500);
+}
+function stopTimedTimerAndFill(){
+  if(!timedStartTime){
+    return;
+  }
+  const ms = Date.now() - timedStartTime;
+  const minutes = (ms / 60000);
+  timedMinutes.value = minutes.toFixed(2).replace(/\.00$/,"");
+  resetTimedTimer();
+  markActivity();
+  maybeAutoStartWorkout();
+}
+
+/* ===========================
+   Selected panel
+   =========================== */
+function isTimedExercise(group, exercise){
+  if(group === "Cardio") return true;
+  if(norm(exercise).toLowerCase() === "plank") return true;
+  return false;
 }
 
 function showSelectedPanel(payload){
-  const exercise = norm(payload.exercise);
-  const group = norm(payload.group);
-
-  ensureFiltersIncludeGroup(group);
-
-  const mode = payload.mode || (isTimedExercise(exercise, group) ? "timed" : "lift");
   selected = {
-    exercise,
-    group,
-    mode,
-    sets: mode === "lift" ? (payload.sets ?? defaultSets(3)).map(normalizeSetObj) : null,
-    minutes: mode === "timed" ? String(payload.minutes ?? "") : ""
+    exercise: payload.exercise,
+    group: payload.group,
+    sets: payload.sets ?? defaultSets(3),
+    timed: isTimedExercise(payload.group, payload.exercise)
   };
-
   selectedName.textContent = selected.exercise;
   selectedMeta.textContent = `${selected.group} • ${currentDate}`;
   selectedWrap.style.display = "block";
 
-  if(selected.mode === "timed"){
+  if(selected.timed){
     liftPanel.style.display = "none";
     timedPanel.style.display = "block";
-    addSetBtn.disabled = true;
+    selectedHint.style.display = "none";
 
-    timedMinutes.value = selected.minutes || "";
-    timedTimerPill.textContent = "Timer: —";
-    timedStartBtn.disabled = false;
-    timedStopBtn.disabled = true;
-    stopTimedTimer(false);
-
-    selectedHint.textContent = "Timed: one field only. Use timer (Stop & fill) or type minutes (e.g., 12.5).";
-  } else {
+    // if there's existing data for timed exercise, fill it
+    const session = getSession(currentDate);
+    const existing = session.completed[selected.exercise];
+    if(existing && typeof existing.timeMinutes === "number"){
+      timedMinutes.value = String(existing.timeMinutes);
+    }else{
+      timedMinutes.value = "";
+    }
+  }else{
     liftPanel.style.display = "block";
     timedPanel.style.display = "none";
-    addSetBtn.disabled = false;
-    stopTimedTimer(false);
-
-    selectedHint.textContent = "Auto-fill: leave Set 1 to auto-fill sets 2–3 (same reps, +10 weight each set).";
+    selectedHint.style.display = "";
     renderSetsTable();
   }
 
-  updateDoneButtonLabel();
   saveInProgress(currentDate, {
     exercise: selected.exercise,
     group: selected.group,
-    mode: selected.mode,
-    sets: selected.mode === "lift" ? selected.sets : undefined,
-    minutes: selected.mode === "timed" ? selected.minutes : undefined
+    sets: selected.sets,
+    timed: selected.timed
   });
-
-  // Mobile only: auto scroll to top when exercise selected
-  if(window.matchMedia && window.matchMedia("(max-width: 640px)").matches){
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
+  markActivity();
+  maybeAutoStartWorkout();
 }
-
 function hideSelectedPanel(){
   selected = null;
   selectedWrap.style.display = "none";
-  stopTimedTimer(false);
   clearInProgress(currentDate);
+  resetTimedTimer();
 }
-
 function renderSetsTable(){
-  if(!selected || selected.mode !== "lift") return;
+  if(!selected || selected.timed) return;
 
-  setsBody.innerHTML = selected.sets.map((s, idx) => {
-    const wVal = String(s.weight ?? "");
-    const displayWeight = wVal === "" ? "" : wVal;
-    return `
-      <tr>
-        <td class="mono" data-label="Set">Set ${idx+1}</td>
-        <td data-label="Reps">
-          <input data-field="reps" data-idx="${idx}" inputmode="numeric" placeholder="e.g., 10" value="${escapeAttr(s.reps)}">
-        </td>
-        <td data-label="Weight">
-          <div class="weight-wrap">
-            <input data-field="weight" data-idx="${idx}" inputmode="decimal" placeholder="0" value="${escapeAttr(displayWeight)}">
-            <button class="btn small bump" type="button" data-action="plus5" data-idx="${idx}" title="Add 5">+5</button>
-          </div>
-        </td>
-      </tr>
-    `;
-  }).join("");
+  setsBody.innerHTML = selected.sets.map((s, idx) => `
+    <tr>
+      <td class="mono" data-label="Set">Set ${idx+1}</td>
+      <td data-label="Reps">
+        <input data-field="reps" data-idx="${idx}" inputmode="numeric" placeholder="e.g., 10" value="${escapeAttr(s.reps)}">
+      </td>
+      <td data-label="Weight">
+        <div class="weight-wrap">
+          <input data-field="weight" data-idx="${idx}" inputmode="decimal" placeholder="e.g., 50" value="${escapeAttr(s.weight)}">
+          <button class="btn bump small" type="button" data-bump="${idx}">+5</button>
+        </div>
+      </td>
+    </tr>
+  `).join("");
 }
 
-/* Auto-fill from Set 1 on blur */
-function applyAutofillFromSet1(){
-  if(!selected || selected.mode !== "lift") return;
-  if(selected.sets.length < 3) return;
-
-  const s1 = selected.sets[0];
-  const reps1 = norm(s1.reps);
-  const w1raw = String(s1.weight ?? "").trim();
-  if(!reps1 || !w1raw) return;
-
-  const base = extractNumberMaybe(w1raw);
-
-  for(let i=1; i<=2; i++){
-    const si = selected.sets[i] ?? (selected.sets[i] = normalizeSetObj({}));
-
-    if(si.autoReps || !norm(si.reps)){
-      si.reps = reps1;
-      si.autoReps = true;
-    }
-    if(si.autoWeight || !String(si.weight ?? "").trim()){
-      const next = base + (i * 10);
-      si.weight = formatNumberSmart(next);
-      si.autoWeight = true;
+/* Auto-fill sets 2–3 when leaving set 1's weight */
+function autoFillFromFirstSet(){
+  if(!selected || selected.timed) return;
+  if(selected.sets.length < 2) return;
+  const base = selected.sets[0];
+  if(!base) return;
+  const reps = norm(base.reps);
+  const weightNum = parseFloat(base.weight);
+  if(!reps || Number.isNaN(weightNum)) return;
+  // Fill sets 2 and 3 (if present)
+  for(let i=1; i<selected.sets.length; i++){
+    if(!selected.sets[i]) continue;
+    if(!selected.sets[i].reps) selected.sets[i].reps = reps;
+    if(!selected.sets[i].weight){
+      selected.sets[i].weight = String(weightNum + 10 * i);
     }
   }
-
   renderSetsTable();
-  saveInProgress(currentDate, { exercise: selected.exercise, group: selected.group, mode:"lift", sets: selected.sets });
+  saveInProgress(currentDate, {
+    exercise: selected.exercise,
+    group: selected.group,
+    sets: selected.sets,
+    timed: selected.timed
+  });
 }
 
 setsBody.addEventListener("input", (e) => {
   const t = e.target;
   if(!(t instanceof HTMLInputElement)) return;
-  if(!selected || selected.mode !== "lift") return;
-
   const idx = Number(t.dataset.idx);
   const field = t.dataset.field;
-  if(Number.isNaN(idx) || !field) return;
-
+  if(!selected || Number.isNaN(idx) || !field) return;
   selected.sets[idx][field] = t.value;
+  saveInProgress(currentDate, { exercise:selected.exercise, group:selected.group, sets:selected.sets, timed:selected.timed });
+  markActivity();
+  maybeAutoStartWorkout();
 
-  if(idx > 0){
-    if(field === "reps") selected.sets[idx].autoReps = false;
-    if(field === "weight") selected.sets[idx].autoWeight = false;
-  }
-
-  saveInProgress(currentDate, { exercise: selected.exercise, group: selected.group, mode:"lift", sets: selected.sets });
-});
-
-setsBody.addEventListener("focusout", (e) => {
-  const t = e.target;
-  if(!(t instanceof HTMLInputElement)) return;
-  if(!selected || selected.mode !== "lift") return;
-
-  const idx = Number(t.dataset.idx);
-  const field = t.dataset.field;
-  if(idx === 0 && (field === "reps" || field === "weight")){
-    applyAutofillFromSet1();
+  if(idx === 0 && field === "weight"){
+    // Debounced-ish auto-fill after first set weight changes
+    autoFillFromFirstSet();
   }
 });
-
 setsBody.addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-action]");
-  if(!btn || !selected || selected.mode !== "lift") return;
-
-  if(btn.dataset.action === "plus5"){
-    const idx = Number(btn.dataset.idx);
+  const bumpBtn = e.target.closest("button[data-bump]");
+  if(bumpBtn && selected && !selected.timed){
+    const idx = Number(bumpBtn.dataset.bump);
     if(Number.isNaN(idx) || !selected.sets[idx]) return;
-
-    const cur = extractNumberMaybe(selected.sets[idx].weight);
-    const next = cur + 5;
-    selected.sets[idx].weight = formatNumberSmart(next);
-
-    if(idx > 0) selected.sets[idx].autoWeight = false;
-
-    const inp = setsBody.querySelector(`input[data-field="weight"][data-idx="${idx}"]`);
-    if(inp) inp.value = selected.sets[idx].weight;
-
-    saveInProgress(currentDate, { exercise: selected.exercise, group: selected.group, mode:"lift", sets: selected.sets });
+    const current = parseFloat(selected.sets[idx].weight || "0");
+    const next = (Number.isNaN(current) ? 0 : current) + 5;
+    selected.sets[idx].weight = String(next);
+    renderSetsTable();
+    saveInProgress(currentDate, { exercise:selected.exercise, group:selected.group, sets:selected.sets, timed:selected.timed });
+    markActivity();
+    maybeAutoStartWorkout();
   }
 });
-
-timedMinutes.addEventListener("input", () => {
-  if(!selected || selected.mode !== "timed") return;
-  selected.minutes = timedMinutes.value;
-  saveInProgress(currentDate, { exercise: selected.exercise, group: selected.group, mode:"timed", minutes: selected.minutes });
-});
-
 addSetBtn.addEventListener("click", () => {
-  if(!selected || selected.mode !== "lift") return;
-  selected.sets.push(normalizeSetObj({ reps:"", weight:"", autoReps:false, autoWeight:false }));
+  if(!selected || selected.timed) return;
+  selected.sets.push({ reps:"", weight:"" });
   renderSetsTable();
-  saveInProgress(currentDate, { exercise: selected.exercise, group: selected.group, mode:"lift", sets: selected.sets });
+  saveInProgress(currentDate, { exercise:selected.exercise, group:selected.group, sets:selected.sets, timed:selected.timed });
+  markActivity();
 });
-
-/* Clear sets also un-done */
 clearSetsBtn.addEventListener("click", () => {
   if(!selected) return;
-
-  if(!confirm("Clear all data for this exercise on this date? This will also undo DONE for this exercise.")) return;
-
-  deleteCompleted(currentDate, selected.exercise);
-
-  if(selected.mode === "timed"){
-    selected.minutes = "";
+  if(!confirm("Clear all sets/time for this exercise?")) return;
+  if(selected.timed){
     timedMinutes.value = "";
-    stopTimedTimer(false);
-    saveInProgress(currentDate, { exercise: selected.exercise, group: selected.group, mode:"timed", minutes: selected.minutes });
-  } else {
+    resetTimedTimer();
+  }else{
     selected.sets = defaultSets(3);
     renderSetsTable();
-    saveInProgress(currentDate, { exercise: selected.exercise, group: selected.group, mode:"lift", sets: selected.sets });
   }
-
-  updateDoneButtonLabel();
-  renderAll();
+  saveInProgress(currentDate, { exercise:selected.exercise, group:selected.group, sets:selected.sets, timed:selected.timed });
+  markActivity();
 });
-
 cancelBtn.addEventListener("click", () => {
   hideSelectedPanel();
   renderAll();
 });
 
-/*
-  DONE button behavior
-  - not done -> done: save, then collapse panel
-  - done -> UNDO: remove, then collapse panel
-*/
+/* DONE: save exercise (sets or time) + collapse */
 doneBtn.addEventListener("click", () => {
   if(!selected) return;
 
-  const already = isCompletedToday(selected.exercise);
-  if(already){
-    // UNDO: remove completion and collapse
-    deleteCompleted(currentDate, selected.exercise);
-    hideSelectedPanel();
-    renderAll();
-    return;
-  }
+  const session = getSession(currentDate);
 
-  // Mark as DONE
-  if(selected.mode === "timed"){
-    const mins = norm(selected.minutes);
+  if(selected.timed){
+    const val = norm(timedMinutes.value);
+    if(!val){
+      if(!confirm("No time entered. Mark as done anyway?")) return;
+    }
+    const minutesNum = parseFloat(val || "0");
     upsertCompleted(currentDate, selected.exercise, {
       group: selected.group,
-      mode: "timed",
-      minutes: mins,
+      timeMinutes: Number.isNaN(minutesNum) ? 0 : minutesNum,
+      sets: [], // keep field for compatibility
       completedAt: new Date().toISOString()
     });
-  } else {
+  }else{
     const cleanedSets = selected.sets.map(s => ({ reps: norm(s.reps), weight: norm(s.weight) }));
     upsertCompleted(currentDate, selected.exercise, {
       group: selected.group,
-      mode: "lift",
       sets: cleanedSets,
       completedAt: new Date().toISOString()
     });
   }
 
-  // Collapse the selected panel after DONE
   hideSelectedPanel();
+  markActivity();
+  maybeAutoStartWorkout();
   renderAll();
 });
 
+/* Timed panel buttons */
+timedStartBtn.addEventListener("click", () => {
+  if(!selected || !selected.timed) return;
+  startTimedTimer();
+  markActivity();
+  maybeAutoStartWorkout();
+});
+timedStopBtn.addEventListener("click", () => {
+  if(!selected || !selected.timed) return;
+  stopTimedTimerAndFill();
+});
+
 /* ===========================
-   Render left groups + inline add
+   Exercise groups + inline add
    =========================== */
+function buildGroupedExercises(){
+  const grouped = new Map();
+  for(const g of BASE_GROUPS){
+    grouped.set(g.group, g.items.map(norm));
+  }
+  for(const c of (store.customExercises || [])){
+    const group = norm(c.group);
+    const name = norm(c.name);
+    if(!group || !name) continue;
+    if(!grouped.has(group)) grouped.set(group, []);
+    const arr = grouped.get(group);
+    if(!arr.includes(name)) arr.push(name);
+  }
+  for(const g of GROUP_ORDER){
+    if(!grouped.has(g)) grouped.set(g, []);
+    grouped.get(g).sort((a,b)=>a.localeCompare(b));
+  }
+  return grouped;
+}
+
 function renderExerciseGroups(){
   const grouped = buildGroupedExercises();
   const session = getSession(currentDate);
   const completed = session.completed || {};
   const prevCompletedSet = getPrevWorkoutCompletedSet(currentDate);
+  const allowedGroups = getAllowedGroups();
 
-  const allCount = Array.from(grouped.values()).reduce((acc, arr) => acc + arr.length, 0);
+  const allCount = Array.from(grouped.entries())
+    .filter(([group]) => allowedGroups.has(group))
+    .reduce((acc, [, arr]) => acc + arr.length, 0);
   const doneCount = Object.keys(completed).length;
 
   completedPill.textContent = `${doneCount} completed`;
   totalPill.textContent = `${allCount} total`;
-
-  const w = session.workout || { startedAt:null, endedAt:null };
-  const statusBits = [];
-  statusBits.push(store.sessions[currentDate] ? "Saved session" : "New session");
-  if(w.startedAt && !w.endedAt) statusBits.push("Workout running");
-  if(w.endedAt) statusBits.push("Workout ended");
-  sessionStatus.textContent = statusBits.join(" • ");
-
-  const allowedGroups = getAllowedGroups();
+  sessionStatus.textContent = (store.sessions[currentDate] ? "Saved session" : "New session");
 
   groupsGrid.innerHTML = PAIRS.map(([leftName, rightName]) => {
-    const leftOk = leftName && allowedGroups.has(leftName);
-    const rightOk = rightName && allowedGroups.has(rightName);
-
-    const left = leftOk ? renderOneGroup(leftName, grouped.get(leftName) || [], completed, prevCompletedSet) : "";
-    const right = rightOk ? renderOneGroup(rightName, grouped.get(rightName) || [], completed, prevCompletedSet) : "";
-
+    const left = allowedGroups.has(leftName) ? renderOneGroup(leftName, grouped.get(leftName) || [], completed, prevCompletedSet) : "";
+    const right = rightName && allowedGroups.has(rightName) ? renderOneGroup(rightName, grouped.get(rightName) || [], completed, prevCompletedSet) : "";
     return left + right;
   }).join("");
 }
@@ -1574,9 +1298,11 @@ function renderOneGroup(groupName, items, completed, prevCompletedSet){
     let badgeHtml = "";
     if(isDone){
       badgeHtml = `<span class="badge" style="color:var(--ok); border-color: rgba(121,255,168,.35);">done</span>`;
-    } else {
+    }else{
       const lastDate = findLastCompletedDateForExercise(ex, currentDate);
-      badgeHtml = lastDate ? `<span class="badge">${escapeHtml(formatMDYY(lastDate))}</span>` : `<span class="badge">tap</span>`;
+      badgeHtml = lastDate
+        ? `<span class="badge">${escapeHtml(formatMDYY(lastDate))}</span>`
+        : `<span class="badge">tap</span>`;
     }
 
     const cls = ["btn","exercise-btn",
@@ -1589,8 +1315,7 @@ function renderOneGroup(groupName, items, completed, prevCompletedSet){
       <button type="button"
               class="${cls}"
               data-exercise="${escapeAttr(ex)}"
-              data-group="${escapeAttr(groupName)}"
-              title="Tap to open. Long-press to hide.">
+              data-group="${escapeAttr(groupName)}">
         <span>${escapeHtml(ex)}</span>
         ${badgeHtml}
       </button>
@@ -1625,47 +1350,6 @@ function renderOneGroup(groupName, items, completed, prevCompletedSet){
   `;
 }
 
-/* ===========================
-   Exercise click + long-press hide
-   =========================== */
-let longPressTimer = null;
-let longPressTarget = null;
-
-function clearLongPress(){
-  if(longPressTimer) clearTimeout(longPressTimer);
-  longPressTimer = null;
-  longPressTarget = null;
-}
-
-groupsGrid.addEventListener("pointerdown", (e) => {
-  const exBtn = e.target.closest("button[data-exercise]");
-  if(!exBtn) return;
-
-  clearLongPress();
-  longPressTarget = exBtn;
-
-  longPressTimer = setTimeout(() => {
-    const exercise = norm(exBtn.dataset.exercise);
-    const group = norm(exBtn.dataset.group);
-    clearLongPress();
-
-    if(confirm(`Hide "${exercise}" from the list?\n\nIt will NOT delete your history. You can still open it from History.`)){
-      hideExercise(group, exercise);
-      if(selected && selected.exercise === exercise && selected.group === group){
-        hideSelectedPanel();
-      }
-      renderAll();
-    }
-  }, 650);
-});
-
-groupsGrid.addEventListener("pointerup", clearLongPress);
-groupsGrid.addEventListener("pointercancel", clearLongPress);
-groupsGrid.addEventListener("pointermove", () => {
-  if(!longPressTimer) return;
-  clearLongPress();
-});
-
 groupsGrid.addEventListener("click", (e) => {
   const exBtn = e.target.closest("button[data-exercise]");
   if(exBtn){
@@ -1675,45 +1359,37 @@ groupsGrid.addEventListener("click", (e) => {
     const session = getSession(currentDate);
     const completedData = session.completed?.[exercise];
 
+    // ensure filters include this group if filters are on
+    ensureFiltersIncludeGroup(group);
+
     if(completedData){
-      if(completedData.mode === "timed"){
+      if(isTimedExercise(completedData.group || group, exercise)){
         showSelectedPanel({
           exercise,
           group: completedData.group || group,
-          mode: "timed",
-          minutes: completedData.minutes ?? ""
+          sets: [],
         });
-      } else {
+        timedMinutes.value = String(completedData.timeMinutes ?? "");
+      }else{
         showSelectedPanel({
           exercise,
           group: completedData.group || group,
-          mode: "lift",
-          sets: (completedData.sets || defaultSets(3)).map(s => normalizeSetObj({ reps: s.reps ?? "", weight: s.weight ?? "" }))
+          sets: (completedData.sets || defaultSets(3)).map(s => ({ reps:s.reps ?? "", weight:s.weight ?? "" }))
         });
       }
-    } else {
-      const last = findLastCompletedForExercise(exercise, currentDate);
-      if(last && last.data){
-        if(last.data.mode === "timed"){
+    }else{
+      if(isTimedExercise(group, exercise)){
+        showSelectedPanel({ exercise, group, sets:[] });
+      }else{
+        const last = findLastCompletedForExercise(exercise, currentDate);
+        if(last){
           showSelectedPanel({
             exercise,
             group,
-            mode: "timed",
-            minutes: last.data.minutes ?? ""
+            sets: (last.data.sets || []).map(s => ({ reps:s.reps ?? "", weight:s.weight ?? "" }))
           });
-        } else {
-          showSelectedPanel({
-            exercise,
-            group,
-            mode: "lift",
-            sets: (last.data.sets || []).map(s => normalizeSetObj({ reps: s.reps ?? "", weight: s.weight ?? "" }))
-          });
-        }
-      } else {
-        if(isTimedExercise(exercise, group)){
-          showSelectedPanel({ exercise, group, mode:"timed", minutes:"" });
-        } else {
-          showSelectedPanel({ exercise, group, mode:"lift", sets: defaultSets(3) });
+        }else{
+          showSelectedPanel({ exercise, group, sets: defaultSets(3) });
         }
       }
     }
@@ -1740,7 +1416,7 @@ groupsGrid.addEventListener("click", (e) => {
     const group = norm(confirmBtn.dataset.addConfirm);
     const input = groupsGrid.querySelector(`input[data-add-input="${cssEscape(group)}"]`);
     const name = norm(input?.value);
-    if(!name) { alert("Please enter an exercise name."); return; }
+    if(!name){ alert("Please enter an exercise name."); return; }
 
     const existsInGroup = (buildGroupedExercises().get(group) || []).includes(name);
     if(existsInGroup){
@@ -1751,6 +1427,8 @@ groupsGrid.addEventListener("click", (e) => {
     store.customExercises.push({ group, name });
     saveStore();
     openAddForGroup = null;
+    markActivity();
+    maybeAutoStartWorkout();
     renderAll();
     return;
   }
@@ -1764,40 +1442,38 @@ groupsGrid.addEventListener("click", (e) => {
 });
 
 /* ===========================
-   Filter UI handlers
+   Date switching
    =========================== */
-document.querySelectorAll("button[data-filter]").forEach(btn => {
-  btn.addEventListener("click", () => {
-    const key = btn.dataset.filter;
-    if(!key) return;
-    store.ui.filters[key] = !store.ui.filters[key];
-    saveStore();
-    renderFilterButtons();
-    openAddForGroup = null;
-    renderAll();
-  });
+datePicker.addEventListener("change", () => {
+  const proposed = datePicker.value;
+  const res = enforceDateNotFuture(proposed);
+  if(!res.ok) return;
+
+  currentDate = res.date;
+  lastValidDate = currentDate;
+  openAddForGroup = null;
+
+  const session = getSession(currentDate);
+  if(session.inProgress && session.inProgress.exercise){
+    showSelectedPanel({
+      exercise: session.inProgress.exercise,
+      group: session.inProgress.group,
+      sets: session.inProgress.sets || defaultSets(3)
+    });
+  }else{
+    hideSelectedPanel();
+  }
+
+  historySelectedDate = currentDate;
+  updateWorkoutButtons();
+  renderAll();
 });
 
-/* ===========================
-   Clear day button with stronger warning
-   =========================== */
 clearDayBtn.addEventListener("click", () => {
-  const msg =
-`ERASE ENTIRE WORKOUT FOR ${currentDate}?
-
-This will permanently delete EVERYTHING for this date:
-• All completed exercises (DONE)
-• Any in-progress sets / timed entries
-• Workout start/end time (workout length)
-
-This cannot be undone.`;
-
-  if(!confirm(msg)) return;
-
+  if(!confirm(`Clear EVERYTHING for ${currentDate}? This will erase all completed exercises and in-progress data for that day.`)) return;
   clearDay(currentDate);
   hideSelectedPanel();
   openAddForGroup = null;
-  updateHeaderWorkoutUI();
   renderAll();
 });
 
@@ -1818,12 +1494,12 @@ function renderTodayPanel(){
   todaySummary.textContent = `${names.length} completed on ${currentDate}:`;
   todayList.innerHTML = names.map(ex => {
     const item = completed[ex];
-    const mode = item.mode || "lift";
-    const right = (mode === "timed")
-      ? `${norm(item.minutes) || "—"} min`
-      : `${(item.sets || []).length} set${(item.sets || []).length===1?"":"s"}`;
-
-    const topLine = `${ex} • ${item.group || "—"} • ${right}`;
+    const isTimed = typeof item.timeMinutes === "number";
+    const sets = (item.sets || []).length;
+    const detail = isTimed
+      ? `${item.timeMinutes ?? "0"} min`
+      : `${sets} set${sets===1?"":"s"}`;
+    const topLine = `${ex} • ${item.group || "—"} • ${detail}`;
     return `
       <div class="pill" style="justify-content:space-between;">
         <span>${escapeHtml(topLine)}</span>
@@ -1846,29 +1522,34 @@ todayList.addEventListener("click", (e) => {
     if(!confirm(`Remove "${ex}" from ${currentDate}?`)) return;
     deleteCompleted(currentDate, ex);
     if(selected && selected.exercise === ex) hideSelectedPanel();
+    markActivity();
     renderAll();
   }
 
   if(action === "edit"){
     const data = session.completed?.[ex];
     if(!data) return;
-
-    if(data.mode === "timed"){
-      showSelectedPanel({ exercise: ex, group: data.group || "—", mode:"timed", minutes: data.minutes ?? "" });
-    } else {
+    if(isTimedExercise(data.group || "—", ex)){
       showSelectedPanel({
         exercise: ex,
         group: data.group || "—",
-        mode:"lift",
-        sets: (data.sets || defaultSets(3)).map(s => normalizeSetObj({ reps: s.reps ?? "", weight: s.weight ?? "" }))
+        sets: []
+      });
+      timedMinutes.value = String(data.timeMinutes ?? "");
+    }else{
+      showSelectedPanel({
+        exercise: ex,
+        group: data.group || "—",
+        sets: (data.sets || defaultSets(3)).map(s => ({ reps:s.reps ?? "", weight:s.weight ?? "" }))
       });
     }
+    markActivity();
     renderAll();
   }
 });
 
 /* ===========================
-   History dropdown + workout length row
+   History
    =========================== */
 function getAllSessionDates(){
   const dates = Object.keys(store.sessions || {}).sort((a,b)=>b.localeCompare(a));
@@ -1887,17 +1568,6 @@ function rebuildHistoryDropdownIfNeeded(){
   }
   historyDateFilter.value = historySelectedDate;
 }
-
-function workoutLengthForDate(date){
-  const session = store.sessions?.[date];
-  if(!session?.workout?.startedAt || !session?.workout?.endedAt) return null;
-  const startMs = Date.parse(session.workout.startedAt);
-  const endMs = Date.parse(session.workout.endedAt);
-  if(!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) return null;
-  const elapsedSec = Math.floor((endMs - startMs) / 1000);
-  return formatMMSS(elapsedSec);
-}
-
 function renderHistory(){
   rebuildHistoryDropdownIfNeeded();
 
@@ -1909,14 +1579,15 @@ function renderHistory(){
   const rows = Object.entries(completed).map(([exercise, data]) => ({
     exercise,
     group: data.group || "",
-    mode: data.mode || "lift",
     sets: data.sets || [],
-    minutes: data.minutes || ""
+    timeMinutes: data.timeMinutes
   })).sort((a,b)=>a.exercise.localeCompare(b.exercise));
 
   const filtered = rows.filter(r => {
     if(!q) return true;
-    const hay = `${r.exercise} ${r.group} ${r.mode} ${(r.sets||[]).map(s=>`${s.reps} ${s.weight}`).join(" ")} ${r.minutes}`.toLowerCase();
+    const detailSets = (r.sets || []).map(s=>`${s.reps} ${s.weight}`).join(" ");
+    const detailTime = r.timeMinutes != null ? String(r.timeMinutes) : "";
+    const hay = `${r.exercise} ${r.group} ${detailSets} ${detailTime}`.toLowerCase();
     return hay.includes(q);
   });
 
@@ -1925,72 +1596,44 @@ function renderHistory(){
     return;
   }
 
-  const wl = workoutLengthForDate(selectedDate);
-  const showWorkoutLengthRow = Boolean(wl) && Object.keys(completed).length > 0;
-
-  const workoutLengthHtml = showWorkoutLengthRow
-    ? `<div class="pill" style="margin-bottom:10px; justify-content:space-between;">
-         <span><strong>Workout length:</strong> <span class="mono">${wl}</span></span>
-       </div>`
-    : "";
-
-  const cards = filtered.map(r => {
-    if(r.mode === "timed"){
-      return `
-        <details class="group" style="padding:10px; background:rgba(0,0,0,.10);">
-          <summary style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
-            <span>
-              <strong>${escapeHtml(r.exercise)}</strong>
-              <span class="muted">• ${escapeHtml(r.group || "—")} • ${escapeHtml(norm(r.minutes) || "—")} min</span>
-            </span>
-            <span class="row" style="gap:8px;">
-              <button class="btn small" type="button" data-hist-action="open" data-date="${escapeAttr(selectedDate)}" data-ex="${escapeAttr(r.exercise)}">Open</button>
-              <button class="btn danger small" type="button" data-hist-action="remove" data-date="${escapeAttr(selectedDate)}" data-ex="${escapeAttr(r.exercise)}">Remove</button>
-            </span>
-          </summary>
-          <div style="margin-top:10px;">
-            <div class="pill" style="background:rgba(0,0,0,.10);">
-              Time in minutes: <span class="mono">${escapeHtml(norm(r.minutes) || "—")}</span>
-            </div>
-          </div>
-        </details>
-      `;
-    }
-
+  historyWrap.innerHTML = filtered.map(r => {
+    const isTimed = typeof r.timeMinutes === "number";
     const setCount = (r.sets || []).length;
-    const details = (r.sets || []).map((s, i) => `
-      <tr>
-        <td class="mono" data-label="Set">${i+1}</td>
-        <td data-label="Reps">${escapeHtml(s.reps || "—")}</td>
-        <td data-label="Weight">${escapeHtml(s.weight || "—")}</td>
-      </tr>
-    `).join("");
+    const details = isTimed
+      ? `<tr><td class="mono" data-label="Set">—</td><td data-label="Reps">—</td><td data-label="Weight/Time">${escapeHtml(String(r.timeMinutes ?? "0"))} min</td></tr>`
+      : (r.sets || []).map((s, i) => `
+        <tr>
+          <td class="mono" data-label="Set">${i+1}</td>
+          <td data-label="Reps">${escapeHtml(s.reps || "—")}</td>
+          <td data-label="Weight/Time">${escapeHtml(s.weight || "—")}</td>
+        </tr>
+      `).join("");
+
+    const summaryDetail = isTimed
+      ? `${r.timeMinutes ?? "0"} min`
+      : `${setCount} set${setCount===1?"":"s"}`;
 
     return `
       <details class="group" style="padding:10px; background:rgba(0,0,0,.10);">
         <summary style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
           <span>
             <strong>${escapeHtml(r.exercise)}</strong>
-            <span class="muted">• ${escapeHtml(r.group || "—")} • ${setCount} set${setCount===1?"":"s"}</span>
+            <span class="muted">• ${escapeHtml(r.group || "—")} • ${summaryDetail}</span>
           </span>
           <span class="row" style="gap:8px;">
             <button class="btn small" type="button" data-hist-action="open" data-date="${escapeAttr(selectedDate)}" data-ex="${escapeAttr(r.exercise)}">Open</button>
-            <button class="btn danger small" type="button" data-hist-action="remove" data-date="${escapeAttr(selectedDate)}" data-ex="${escapeAttr(r.exercise)}">Remove</button>
           </span>
         </summary>
         <div style="margin-top:10px;">
           <table class="table">
-            <thead><tr><th>Set</th><th>Reps</th><th>Weight</th></tr></thead>
+            <thead><tr><th>Set</th><th>Reps</th><th>Weight/Time</th></tr></thead>
             <tbody>${details}</tbody>
           </table>
         </div>
       </details>
     `;
   }).join("");
-
-  historyWrap.innerHTML = workoutLengthHtml + cards;
 }
-
 historyDateFilter.addEventListener("change", () => {
   historySelectedDate = historyDateFilter.value;
   renderHistory();
@@ -2000,52 +1643,41 @@ historySearch.addEventListener("input", renderHistory);
 historyWrap.addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-hist-action]");
   if(!btn) return;
-
-  const action = btn.dataset.histAction;
   const date = btn.dataset.date;
   const ex = norm(btn.dataset.ex);
 
-  if(action === "remove"){
-    if(!confirm(`Remove "${ex}" from ${date}?`)) return;
-    const old = currentDate;
-    deleteCompleted(date, ex);
-    if(old === date && selected && selected.exercise === ex) hideSelectedPanel();
-    renderAll();
-    return;
-  }
+  const res = enforceDateNotFuture(date);
+  if(!res.ok) return;
 
-  if(action === "open"){
-    const res = enforceDateNotFuture(date);
-    if(!res.ok) return;
+  currentDate = res.date;
+  lastValidDate = currentDate;
+  datePicker.value = currentDate;
+  historySelectedDate = currentDate;
 
-    currentDate = res.date;
-    lastValidDate = currentDate;
-    datePicker.value = currentDate;
-    historySelectedDate = currentDate;
-
-    const session = getSession(currentDate);
-    const data = session.completed?.[ex];
-
-    if(data){
-      if(data.mode === "timed"){
-        showSelectedPanel({ exercise: ex, group: data.group || "—", mode:"timed", minutes: data.minutes ?? "" });
-      } else {
-        showSelectedPanel({
-          exercise: ex,
-          group: data.group || "—",
-          mode:"lift",
-          sets: (data.sets || defaultSets(3)).map(s => normalizeSetObj({ reps: s.reps ?? "", weight: s.weight ?? "" }))
-        });
-      }
-    } else {
-      hideSelectedPanel();
+  const session = getSession(currentDate);
+  const data = session.completed?.[ex];
+  if(data){
+    if(isTimedExercise(data.group || "—", ex)){
+      showSelectedPanel({
+        exercise: ex,
+        group: data.group || "—",
+        sets: []
+      });
+      timedMinutes.value = String(data.timeMinutes ?? "");
+    }else{
+      showSelectedPanel({
+        exercise: ex,
+        group: data.group || "—",
+        sets: (data.sets || defaultSets(3)).map(s => ({ reps:s.reps ?? "", weight:s.weight ?? "" }))
+      });
     }
-
-    openAddForGroup = null;
-    updateHeaderWorkoutUI();
-    renderAll();
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  }else{
+    hideSelectedPanel();
   }
+  openAddForGroup = null;
+  updateWorkoutButtons();
+  renderAll();
+  window.scrollTo({ top: 0, behavior: "smooth" });
 });
 
 /* ===========================
@@ -2054,7 +1686,7 @@ historyWrap.addEventListener("click", (e) => {
 function csvEscape(value){
   const s = String(value ?? "");
   const needsQuotes = /[",\n\r]/.test(s);
-  const escaped = s.replaceAll(`"`, `""`);
+  const escaped = s.replaceAll(`"`,`""`);
   return needsQuotes ? `"${escaped}"` : escaped;
 }
 function buildCsvRows(){
@@ -2064,20 +1696,17 @@ function buildCsvRows(){
     const completed = store.sessions[date]?.completed || {};
     for(const [exercise, data] of Object.entries(completed)){
       const group = data.group || "";
-      const mode = data.mode || "lift";
-
-      if(mode === "timed"){
-        rows.push([date, group, exercise, "1", "", data.minutes ?? ""]);
+      if(typeof data.timeMinutes === "number"){
+        rows.push([date, group, exercise, "", "", String(data.timeMinutes)]);
         continue;
       }
-
       const sets = Array.isArray(data.sets) ? data.sets : [];
       if(sets.length === 0){
         rows.push([date, group, exercise, "", "", ""]);
         continue;
       }
       sets.forEach((s, idx) => {
-        rows.push([date, group, exercise, String(idx + 1), s?.reps ?? "", s?.weight ?? ""]);
+        rows.push([date, group, exercise, String(idx+1), s?.reps ?? "", s?.weight ?? ""]);
       });
     }
   }
@@ -2101,20 +1730,62 @@ exportCsvBtn.addEventListener("click", () => {
 });
 
 /* ===========================
-   Init + render
+   Year counter
+   =========================== */
+function renderYearCount(){
+  const d = new Date();
+  const year = d.getFullYear();
+  let count = 0;
+  for(const [date, session] of Object.entries(store.sessions)){
+    if(date.startsWith(String(year))){
+      if(Object.keys(session.completed || {}).length > 0){
+        count += 1;
+      }
+    }
+  }
+  const text = `${year} workouts: ${count}`;
+  yearCountPill.textContent = text;
+  yearCountPillMobile.textContent = text;
+}
+
+/* ===========================
+   Workout Start/End buttons
+   =========================== */
+startWorkoutBtn.addEventListener("click", () => {
+  startWorkoutIfPossible();
+});
+startWorkoutBtnMobile.addEventListener("click", () => {
+  startWorkoutIfPossible();
+});
+endWorkoutBtn.addEventListener("click", () => {
+  endWorkoutIfRunning({ auto:false });
+});
+endWorkoutBtnMobile.addEventListener("click", () => {
+  endWorkoutIfRunning({ auto:false });
+});
+
+/* ===========================
+   Render all
    =========================== */
 function renderAll(){
   renderFilterButtons();
   renderExerciseGroups();
   renderTodayPanel();
   renderHistory();
-  updateHeaderWorkoutUI();
+  renderYearCount();
+  renderWorkoutTimerPills();
 }
 
+/* ===========================
+   Init
+   =========================== */
 (function init(){
-  currentDate = todayISO();
+  const t = todayISO();
+  datePicker.max = t;
+  if(!datePicker.value) datePicker.value = currentDate;
+
+  currentDate = datePicker.value || t;
   lastValidDate = currentDate;
-  datePicker.value = currentDate;
   historySelectedDate = currentDate;
 
   const session = getSession(currentDate);
@@ -2122,19 +1793,15 @@ function renderAll(){
     showSelectedPanel({
       exercise: session.inProgress.exercise,
       group: session.inProgress.group,
-      mode: session.inProgress.mode,
-      sets: session.inProgress.sets,
-      minutes: session.inProgress.minutes
+      sets: session.inProgress.sets || defaultSets(3)
     });
-  } else {
+  }else{
     hideSelectedPanel();
   }
 
   showFutureWarning(false);
+  reconcileWorkoutOnLoad();
   renderAll();
-
-  tickWorkoutTimer();
-  setInterval(tickWorkoutTimer, 1000);
 })();
 </script>
 </body>
