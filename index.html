@@ -148,7 +148,7 @@
       margin-bottom:10px;
     }
     .selected-name{font-weight:650}
-    .selected-meta{font-size:12px;color:var(--muted)}
+    .selected-meta{font-size:12px;color:var(--muted);display:none;} /* hide group • date line */
 
     .table{
       width:100%;
@@ -168,6 +168,26 @@
     .table th{color:var(--muted);font-weight:600;font-size:12px}
     .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;}
 
+    /* Reps + weight layout inside sets table */
+    .reps-wrap,
+    .weight-wrap{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .reps-input,
+    .weight-input{
+      width:5ch;           /* fits up to ~5 numerals comfortably */
+      flex:0 0 auto;
+      text-align:right;
+    }
+    .btn.bump{
+      padding:7px 9px;
+      border-radius:10px;
+      font-size:12px;
+      white-space:nowrap;
+    }
+
     .add-inline{
       display:grid;
       gap:8px;
@@ -186,32 +206,13 @@
       background:rgba(0,0,0,.10);
     }
 
-    /* Reps + weight layout */
-    .reps-wrap{
+    /* Bottom actions for selected exercise */
+    .selected-actions{
       display:flex;
+      justify-content:space-between;
       align-items:center;
-      gap:8px;
-      width:100%;
-    }
-    .reps-input{
-      width:7ch;     /* roomy for ~5 digits */
-      text-align:right;
-    }
-    .weight-wrap{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      width:100%;
-    }
-    .weight-wrap input{
-      min-width:7ch; /* at least 5 digits of space */
-    }
-
-    .btn.bump{
-      padding:7px 9px;
-      border-radius:10px;
-      font-size:12px;
-      white-space:nowrap;
+      gap:10px;
+      margin-top:10px;
     }
 
     .right-col{display:grid;gap:14px}
@@ -285,53 +286,11 @@
         backdrop-filter: blur(10px);
       }
 
-      /* Convert tables (sets/history) into "cards" */
-      .table{ border-radius:14px; }
-      .table thead{ display:none; }
-      .table, .table tbody, .table tr, .table td{ display:block; width:100%; }
-      .table tr{
-        border-bottom:1px solid var(--border);
-        padding:10px 10px 6px;
-      }
+      /* Slightly tighter cells on small screens */
+      .table th,
       .table td{
-        border-bottom:none;
-        padding:6px 0;
-        display:flex;
-        justify-content:space-between;
-        gap:10px;
-        align-items:center;
+        padding:8px 6px;
       }
-
-      /* Mobile overrides for reps layout */
-      .table td .reps-wrap{
-        justify-content:flex-start;
-      }
-      .table td .reps-input{
-        width:7ch;  /* up to 5 digits */
-      }
-
-      .table td::before{
-        content: attr(data-label);
-        color: var(--muted);
-        font-size:12px;
-        padding-right:10px;
-        white-space:nowrap;
-      }
-
-      /* All non-reps inputs (weight/time) take ~60% width */
-      .table td input:not(.reps-input){
-        width:58%;
-        padding:10px;
-        border-radius:12px;
-      }
-
-      .weight-wrap{
-        width:58%;
-        justify-content:flex-end;
-      }
-      .weight-wrap input{ width:100%; }
-
-      .btn.bump{ padding:10px 12px; border-radius:12px; }
     }
   </style>
 </head>
@@ -419,9 +378,9 @@
               <table class="table" aria-label="Sets table">
                 <thead>
                   <tr>
-                    <th style="width:90px;">Set</th>
-                    <th style="width:170px;">Reps</th>
-                    <th style="width:260px;">Weight</th>
+                    <th style="width:70px;">Set</th>
+                    <th style="width:190px;">Reps</th>
+                    <th style="width:220px;">Weight</th>
                   </tr>
                 </thead>
                 <tbody id="setsBody"></tbody>
@@ -444,10 +403,11 @@
               </div>
             </div>
 
-            <div class="row" style="margin-top:10px;">
-              <button class="btn primary" type="button" id="addSetBtn">+1</button>
+            <div class="selected-actions">
+              <button class="btn primary" type="button" id="addSetBtn">Add set</button>
               <button class="btn ok" type="button" id="doneBtn">DONE</button>
             </div>
+            <span class="mini" id="selectedHint">Auto-fills sets 2–3 when you leave Set 1 (same reps, +10 weight each set).</span>
           </div>
         </div>
 
@@ -630,6 +590,7 @@ const setsBody = document.getElementById("setsBody");
 const addSetBtn = document.getElementById("addSetBtn");
 const doneBtn = document.getElementById("doneBtn");
 const cancelBtn = document.getElementById("cancelBtn");
+const selectedHint = document.getElementById("selectedHint");
 const liftPanel = document.getElementById("liftPanel");
 const timedPanel = document.getElementById("timedPanel");
 const timedMinutes = document.getElementById("timedMinutes");
@@ -904,14 +865,13 @@ function maybeAutoStartWorkout(){
   if(!isToday(currentDate)) return;
   const s = getSession(currentDate);
   if(s.workout.startedAt || s.workout.endedAt) return;
-  // silent auto-start
   startWorkoutIfPossible();
 }
 
 /* End workout (manual or inactivity) */
 function endWorkoutIfRunning({ auto=false, inactivityEndMs=null } = {}){
   const s = getSession(currentDate);
-  if(!s.workout.startedAt || s.workout.endedAt) return; // nothing to end / already locked
+  if(!s.workout.startedAt || s.workout.endedAt) return;
 
   let endTime;
   if(auto && inactivityEndMs != null){
@@ -923,7 +883,7 @@ function endWorkoutIfRunning({ auto=false, inactivityEndMs=null } = {}){
   saveStore();
   updateWorkoutButtons();
   stopWorkoutTimerLoop();
-  renderWorkoutTimerPills(); // show final duration
+  renderWorkoutTimerPills();
 }
 
 /* Timer loop + display */
@@ -938,7 +898,6 @@ function getWorkoutElapsedMsForDate(date){
     if(!endMs || Number.isNaN(endMs)) return 0;
     return Math.max(0, endMs - startMs);
   }else{
-    // still active
     const nowMs = Date.now();
     return Math.max(0, nowMs - startMs);
   }
@@ -979,14 +938,12 @@ function reconcileWorkoutOnLoad(){
       const cutoff = lastActMs + INACTIVITY_LIMIT_MS;
       const nowMs = Date.now();
       if(nowMs >= cutoff){
-        // auto-end at cutoff
         sToday.workout.endedAt = new Date(cutoff).toISOString();
         saveStore();
       }
     }
   }
 
-  // Start timer loop if today's workout is still active
   if(isToday(currentDate)){
     const s = getSession(currentDate);
     if(s.workout.startedAt && !s.workout.endedAt){
@@ -997,11 +954,11 @@ function reconcileWorkoutOnLoad(){
   updateWorkoutButtons();
 }
 
-/* Inactivity checker (runs regardless of date view, but only acts on today) */
+/* Inactivity checker */
 setInterval(() => {
   const today = todayISO();
   const s = getSession(today);
-  if(!s.workout.startedAt || s.workout.endedAt) return; // no active workout
+  if(!s.workout.startedAt || s.workout.endedAt) return;
 
   const lastActMs = store.ui.lastActivityAt ? Date.parse(store.ui.lastActivityAt) : null;
   if(!lastActMs || Number.isNaN(lastActMs)) return;
@@ -1009,15 +966,14 @@ setInterval(() => {
   const cutoff = lastActMs + INACTIVITY_LIMIT_MS;
   const nowMs = Date.now();
   if(nowMs >= cutoff){
-    // End today's workout at cutoff
     const prevCurrent = currentDate;
-    currentDate = today; // ensure end applies to today session
+    currentDate = today;
     endWorkoutIfRunning({ auto:true, inactivityEndMs:cutoff });
     currentDate = prevCurrent;
   }
 }, INACTIVITY_CHECK_MS);
 
-/* Update Start/End buttons based on session + date */
+/* Update Start/End buttons */
 function updateWorkoutButtons(){
   const s = getSession(currentDate);
   const isTod = isToday(currentDate);
@@ -1025,7 +981,6 @@ function updateWorkoutButtons(){
   const started = !!s.workout.startedAt;
   const ended = !!s.workout.endedAt;
 
-  // Only today can start manually
   const canStart = isTod && !started && !ended;
   const canEnd = isTod && started && !ended;
 
@@ -1089,8 +1044,8 @@ function showSelectedPanel(payload){
   if(selected.timed){
     liftPanel.style.display = "none";
     timedPanel.style.display = "block";
+    selectedHint.style.display = "none";
 
-    // if there's existing data for timed exercise, fill it
     const session = getSession(currentDate);
     const existing = session.completed[selected.exercise];
     if(existing && typeof existing.timeMinutes === "number"){
@@ -1101,6 +1056,7 @@ function showSelectedPanel(payload){
   }else{
     liftPanel.style.display = "block";
     timedPanel.style.display = "none";
+    selectedHint.style.display = "";
     renderSetsTable();
   }
 
@@ -1119,6 +1075,7 @@ function hideSelectedPanel(){
   clearInProgress(currentDate);
   resetTimedTimer();
 }
+
 function renderSetsTable(){
   if(!selected || selected.timed) return;
 
@@ -1153,6 +1110,7 @@ function renderSetsTable(){
       <td data-label="Weight">
         <div class="weight-wrap">
           <input
+            class="weight-input"
             data-field="weight"
             data-idx="${idx}"
             inputmode="decimal"
@@ -1174,7 +1132,6 @@ function autoFillFromFirstSet(){
   const reps = norm(base.reps);
   const weightNum = parseFloat(base.weight);
   if(!reps || Number.isNaN(weightNum)) return;
-  // Fill sets 2 and 3 (if present)
   for(let i=1; i<selected.sets.length; i++){
     if(!selected.sets[i]) continue;
     if(!selected.sets[i].reps) selected.sets[i].reps = reps;
@@ -1209,7 +1166,8 @@ setsBody.addEventListener("input", (e) => {
   markActivity();
   maybeAutoStartWorkout();
 });
-// Auto-fill sets 2–3 only when you leave Set 1 weight
+
+/* Auto-fill when leaving Set 1 weight */
 setsBody.addEventListener("blur", (e) => {
   const t = e.target;
   if(!(t instanceof HTMLInputElement)) return;
@@ -1219,16 +1177,15 @@ setsBody.addEventListener("blur", (e) => {
 
   if(!selected || Number.isNaN(idx) || !field) return;
 
-  // Only trigger when leaving Set 1's weight field
   if(idx === 0 && field === "weight"){
     autoFillFromFirstSet();
   }
-}, true); // use capture so blur bubbles up
+}, true);
 
+/* Click handlers for reps +/- and weight +5 */
 setsBody.addEventListener("click", (e) => {
   if(!selected || selected.timed) return;
 
-  // Handle reps -1 / +1 buttons
   const repsBtn = e.target.closest("button[data-reps-delta]");
   if(repsBtn){
     const idx = Number(repsBtn.dataset.idx);
@@ -1238,14 +1195,11 @@ setsBody.addEventListener("click", (e) => {
     let current = parseInt(selected.sets[idx].reps || "0", 10);
     if(Number.isNaN(current)) current = 0;
 
-    // Special rule for Set 1: -1 does nothing unless reps >= 2
     if(idx === 0 && delta === -1 && current < 2){
-      return; // no change
+      return;
     }
 
     let next = current + delta;
-
-    // Never allow reps < 0
     if(next < 0) next = 0;
 
     selected.sets[idx].reps = String(next);
@@ -1262,7 +1216,6 @@ setsBody.addEventListener("click", (e) => {
     return;
   }
 
-  // Handle weight +5 buttons
   const bumpBtn = e.target.closest("button[data-bump]");
   if(bumpBtn){
     const idx = Number(bumpBtn.dataset.bump);
@@ -1298,7 +1251,7 @@ cancelBtn.addEventListener("click", () => {
   renderAll();
 });
 
-/* DONE: save exercise (sets or time) + collapse */
+/* DONE: save exercise */
 doneBtn.addEventListener("click", () => {
   if(!selected) return;
 
@@ -1313,7 +1266,7 @@ doneBtn.addEventListener("click", () => {
     upsertCompleted(currentDate, selected.exercise, {
       group: selected.group,
       timeMinutes: Number.isNaN(minutesNum) ? 0 : minutesNum,
-      sets: [], // keep field for compatibility
+      sets: [],
       completedAt: new Date().toISOString()
     });
   }else{
@@ -1459,7 +1412,6 @@ groupsGrid.addEventListener("click", (e) => {
     const session = getSession(currentDate);
     const completedData = session.completed?.[exercise];
 
-    // ensure filters include this group if filters are on
     ensureFiltersIncludeGroup(group);
 
     if(completedData){
@@ -1503,7 +1455,6 @@ groupsGrid.addEventListener("click", (e) => {
     openAddForGroup = null;
     renderExerciseGroups();
 
-    // scroll selected panel into view
     if (selectedWrap) {
       selectedWrap.scrollIntoView({ behavior: "smooth", block: "start" });
     }
