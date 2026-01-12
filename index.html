@@ -176,14 +176,14 @@
       gap:8px;
     }
 
-   /* Fixed width so 3 digits always fit */
-.reps-input,
-.weight-input{
-  width:70px;      /* <- THIS is the one number you can tweak (try 50–70px range) */
-  padding:8px 6px; /* slightly tighter padding than the global input rule */
-  flex:0 0 auto;
-  text-align:right;
-}
+    /* Wide enough for 3-digit numbers */
+    .reps-input,
+    .weight-input{
+      width:60px;
+      padding:8px 6px;
+      flex:0 0 auto;
+      text-align:right;
+    }
 
     .btn.bump{
       padding:7px 9px;
@@ -408,10 +408,12 @@
             </div>
 
             <div class="selected-actions">
-              <!-- UPDATED: Add set button becomes a small +1 pill -->
+              <!-- Add set button as a small +1 pill -->
               <button class="btn primary small" type="button" id="addSetBtn" aria-label="Add set">+1</button>
               <button class="btn ok" type="button" id="doneBtn">DONE</button>
             </div>
+            <!-- Hint text removed; span kept for JS safety -->
+            <span class="mini" id="selectedHint"></span>
           </div>
         </div>
 
@@ -1048,7 +1050,7 @@ function showSelectedPanel(payload){
   if(selected.timed){
     liftPanel.style.display = "none";
     timedPanel.style.display = "block";
-    selectedHint.style.display = "none";
+    if(selectedHint) selectedHint.style.display = "none";
 
     const session = getSession(currentDate);
     const existing = session.completed[selected.exercise];
@@ -1060,7 +1062,7 @@ function showSelectedPanel(payload){
   }else{
     liftPanel.style.display = "block";
     timedPanel.style.display = "none";
-    selectedHint.style.display = "";
+    if(selectedHint) selectedHint.style.display = "";
     renderSetsTable();
   }
 
