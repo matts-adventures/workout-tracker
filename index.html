@@ -185,16 +185,18 @@
       font-size:12px;
       background:rgba(0,0,0,.10);
     }
-.reps-wrap{
-  display:flex;
-  align-items:center;
-  gap:8px;
-  width:100%;
-}
-.reps-input{
-  width:3ch;     /* fits up to 3 digits */
-  text-align:right;
-}
+
+    /* Reps / weight layout (desktop / default) */
+    .reps-wrap{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      width:100%;
+    }
+    .reps-input{
+      width:100%;          /* full width on desktop */
+      text-align:right;
+    }
     .weight-wrap{
       display:flex;
       align-items:center;
@@ -287,7 +289,7 @@
         border-bottom:1px solid var(--border);
         padding:10px 10px 6px;
       }
-           .table td{
+      .table td{
         border-bottom:none;
         padding:6px 0;
         display:flex;
@@ -301,8 +303,9 @@
         justify-content:flex-start;
       }
       .table td .reps-input{
-        width:3ch;  /* up to 3 digits */
+        width:3ch;  /* up to 3 digits on mobile */
       }
+
       .table td::before{
         content: attr(data-label);
         color: var(--muted);
@@ -310,6 +313,8 @@
         padding-right:10px;
         white-space:nowrap;
       }
+
+      /* Only non-reps inputs (weight) get the 58% width on mobile */
       .table td input:not(.reps-input){
         width: 58%;
         padding:10px;
@@ -1154,7 +1159,7 @@ function renderSetsTable(){
             inputmode="decimal"
             placeholder="e.g., 50"
             value="${escapeAttr(s.weight)}">
-          <button class="btn bump small" type="button" data-bump="${idx}">+5</button>
+          <button class="btn.bump btn bump small" type="button" data-bump="${idx}">+5</button>
         </div>
       </td>
     </tr>
@@ -1205,7 +1210,8 @@ setsBody.addEventListener("input", (e) => {
   markActivity();
   maybeAutoStartWorkout();
 });
-  // Auto-fill sets 2–3 only when you leave Set 1 weight
+
+// Auto-fill sets 2–3 only when you leave Set 1 weight
 setsBody.addEventListener("blur", (e) => {
   const t = e.target;
   if(!(t instanceof HTMLInputElement)) return;
@@ -1220,16 +1226,19 @@ setsBody.addEventListener("blur", (e) => {
     autoFillFromFirstSet();
   }
 }, true); // use capture so blur bubbles up
+
 setsBody.addEventListener("click", (e) => {
   if(!selected || selected.timed) return;
 
   // Handle reps -1 / +1 buttons
   const repsBtn = e.target.closest("button[data-reps-delta]");
   if(repsBtn){
-    const idx = Number(repsBtn.dataset.idx);
+    const idx = Number(repsBtn.getAttribute("data-idx"));
     if(Number.isNaN(idx) || !selected.sets[idx]) return;
 
-    const delta = parseInt(repsBtn.dataset.repsDelta, 10) || 0;
+    const delta = parseInt(repsBtn.getAttribute("data-reps-delta"), 10);
+    if(Number.isNaN(delta)) return;
+
     let current = parseInt(selected.sets[idx].reps || "0", 10);
     if(Number.isNaN(current)) current = 0;
 
@@ -1279,6 +1288,7 @@ setsBody.addEventListener("click", (e) => {
     maybeAutoStartWorkout();
   }
 });
+
 addSetBtn.addEventListener("click", () => {
   if(!selected || selected.timed) return;
   selected.sets.push({ reps:"", weight:"" });
@@ -1509,7 +1519,7 @@ groupsGrid.addEventListener("click", (e) => {
     openAddForGroup = null;
     renderExerciseGroups();
 
-    // 🔽 NEW: scroll the selected panel into view, instead of top of page
+    // scroll the selected panel into view, instead of top of page
     if (selectedWrap) {
       selectedWrap.scrollIntoView({ behavior: "smooth", block: "start" });
     }
