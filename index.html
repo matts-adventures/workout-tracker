@@ -186,17 +186,17 @@
       background:rgba(0,0,0,.10);
     }
 
-    /* Reps + buttons */
+    /* Reps layout (desktop/tablet) */
     .reps-wrap{
       display:flex;
       align-items:center;
       gap:8px;
+      width:100%;
     }
     .reps-input{
-      width:3.8ch;        /* comfortably fits 3 digits */
-      min-width:3.8ch;
-      max-width:4.2ch;
-      text-align:right;
+      width:48px;           /* comfortably fits 2–3 digits */
+      padding:6px 4px;
+      text-align:center;
     }
 
     .weight-wrap{
@@ -300,6 +300,14 @@
         align-items:center;
       }
 
+      /* Mobile overrides for reps layout */
+      .table td .reps-wrap{
+        justify-content:flex-start;
+      }
+      .table td .reps-input{
+        width:48px;       /* same as desktop */
+      }
+
       .table td::before{
         content: attr(data-label);
         color: var(--muted);
@@ -308,28 +316,18 @@
         white-space:nowrap;
       }
 
-      /* Mobile input widths */
-      .table td input{
+      /* All non-reps inputs (re-use previous width) */
+      .table td input:not(.reps-input){
         width: 58%;
         padding:10px;
         border-radius:12px;
       }
+
       .weight-wrap{
         width: 58%;
         justify-content:flex-end;
       }
       .weight-wrap input{ width: 100%; }
-
-      /* Ensure reps are still visible on mobile */
-      .table td .reps-wrap{
-        justify-content:flex-start;
-      }
-      .table td .reps-input{
-        width:3.8ch;
-        min-width:3.8ch;
-        max-width:4.2ch;
-      }
-
       .btn.bump{ padding:10px 12px; border-radius:12px; }
     }
   </style>
@@ -1130,7 +1128,7 @@ function renderSetsTable(){
 
   setsBody.innerHTML = selected.sets.map((s, idx) => `
     <tr>
-      <td class="mono" data-label="Set">Set ${idx+1}</td>
+      <td class="mono" data-label="Set">${idx+1}</td>
       <td data-label="Reps">
         <div class="reps-wrap">
           <input
@@ -1164,7 +1162,7 @@ function renderSetsTable(){
             inputmode="decimal"
             placeholder="e.g., 50"
             value="${escapeAttr(s.weight)}">
-          <button class="btn.bump btn bump small" type="button" data-bump="${idx}">+5</button>
+          <button class="btn bump small" type="button" data-bump="${idx}">+5</button>
         </div>
       </td>
     </tr>
