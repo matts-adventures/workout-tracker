@@ -175,12 +175,15 @@
       align-items:center;
       gap:8px;
     }
+
+    /* UPDATED: narrow numeric inputs to fit ~3 digits */
     .reps-input,
     .weight-input{
-      width:5ch;           /* fits up to ~5 numerals comfortably */
+      width:4ch;           /* fits 3 numerals at current font size */
       flex:0 0 auto;
       text-align:right;
     }
+
     .btn.bump{
       padding:7px 9px;
       border-radius:10px;
@@ -404,7 +407,8 @@
             </div>
 
             <div class="selected-actions">
-              <button class="btn primary" type="button" id="addSetBtn">Add set</button>
+              <!-- UPDATED: Add set button becomes a small +1 pill -->
+              <button class="btn primary small" type="button" id="addSetBtn" aria-label="Add set">+1</button>
               <button class="btn ok" type="button" id="doneBtn">DONE</button>
             </div>
             <span class="mini" id="selectedHint">Auto-fills sets 2–3 when you leave Set 1 (same reps, +10 weight each set).</span>
@@ -1089,7 +1093,6 @@ function renderSetsTable(){
             data-field="reps"
             data-idx="${idx}"
             inputmode="numeric"
-            placeholder="e.g., 10"
             value="${escapeAttr(s.reps)}">
           <button
             class="btn bump small"
@@ -1114,7 +1117,6 @@ function renderSetsTable(){
             data-field="weight"
             data-idx="${idx}"
             inputmode="decimal"
-            placeholder="e.g., 50"
             value="${escapeAttr(s.weight)}">
           <button class="btn bump small" type="button" data-bump="${idx}">+5</button>
         </div>
