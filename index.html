@@ -186,15 +186,17 @@
       background:rgba(0,0,0,.10);
     }
 
-    /* Reps / weight layout (desktop / default) */
+    /* Reps + weight layout */
     .reps-wrap{
       display:flex;
       align-items:center;
       gap:8px;
       width:100%;
     }
+    /* reps input behaves similar to weight input */
     .reps-input{
-      width:100%;          /* full width on desktop */
+      flex:1;
+      min-width:0;
       text-align:right;
     }
     .weight-wrap{
@@ -202,6 +204,10 @@
       align-items:center;
       gap:8px;
       width:100%;
+    }
+    .weight-wrap input{
+      flex:1;
+      min-width:0;
     }
     .btn.bump{
       padding:7px 9px;
@@ -281,15 +287,21 @@
         backdrop-filter: blur(10px);
       }
 
-      /* Convert tables (sets/history) into "cards" */
-      .table{ border-radius:14px; }
-      .table thead{ display:none; }
-      .table, .table tbody, .table tr, .table td{ display:block; width:100%; }
-      .table tr{
+      /* Convert only HISTORY table into "cards" on mobile */
+      .table.table--history{ border-radius:14px; }
+      .table.table--history thead{ display:none; }
+      .table.table--history,
+      .table.table--history tbody,
+      .table.table--history tr,
+      .table.table--history td{
+        display:block;
+        width:100%;
+      }
+      .table.table--history tr{
         border-bottom:1px solid var(--border);
         padding:10px 10px 6px;
       }
-      .table td{
+      .table.table--history td{
         border-bottom:none;
         padding:6px 0;
         display:flex;
@@ -297,16 +309,7 @@
         gap:10px;
         align-items:center;
       }
-
-      /* Mobile overrides for reps layout */
-      .table td .reps-wrap{
-        justify-content:flex-start;
-      }
-      .table td .reps-input{
-        width:3ch;  /* up to 3 digits on mobile */
-      }
-
-      .table td::before{
+      .table.table--history td::before{
         content: attr(data-label);
         color: var(--muted);
         font-size:12px;
@@ -314,17 +317,7 @@
         white-space:nowrap;
       }
 
-      /* Only non-reps inputs (weight) get the 58% width on mobile */
-      .table td input:not(.reps-input){
-        width: 58%;
-        padding:10px;
-        border-radius:12px;
-      }
-      .weight-wrap{
-        width: 58%;
-        justify-content:flex-end;
-      }
-      .weight-wrap input{ width: 100%; }
+      /* Keep mobile bump buttons comfy */
       .btn.bump{ padding:10px 12px; border-radius:12px; }
     }
   </style>
@@ -334,7 +327,7 @@
   <div class="wrap">
     <header>
       <div>
-        <h1>Workout Tracker v7</h1>
+        <h1>Workout Tracker</h1>
         <p class="sub">Pick an exercise → log sets (or time) → DONE. Completed exercises turn green. Badges show the last completed date.</p>
       </div>
 
@@ -410,7 +403,7 @@
 
             <!-- Lift panel -->
             <div id="liftPanel">
-              <table class="table" aria-label="Sets table">
+              <table class="table table--sets" aria-label="Sets table">
                 <thead>
                   <tr>
                     <th style="width:90px;">Set</th>
@@ -886,7 +879,7 @@ function markActivity(){
 function startWorkoutIfPossible(){
   if(!isToday(currentDate)) return;
   const s = getSession(currentDate);
-  if(s.workout.startedAt || s.workout.endedAt) return; // already started or locked
+  if(s.workout.startedAt || s.workout.endedAt) return;
 
   const nowIso = new Date().toISOString();
   s.workout.startedAt = nowIso;
@@ -902,14 +895,13 @@ function maybeAutoStartWorkout(){
   if(!isToday(currentDate)) return;
   const s = getSession(currentDate);
   if(s.workout.startedAt || s.workout.endedAt) return;
-  // silent auto-start
   startWorkoutIfPossible();
 }
 
 /* End workout (manual or inactivity) */
 function endWorkoutIfRunning({ auto=false, inactivityEndMs=null } = {}){
   const s = getSession(currentDate);
-  if(!s.workout.startedAt || s.workout.endedAt) return; // nothing to end / already locked
+  if(!s.workout.startedAt || s.workout.endedAt) return;
 
   let endTime;
   if(auto && inactivityEndMs != null){
@@ -921,7 +913,7 @@ function endWorkoutIfRunning({ auto=false, inactivityEndMs=null } = {}){
   saveStore();
   updateWorkoutButtons();
   stopWorkoutTimerLoop();
-  renderWorkoutTimerPills(); // show final duration
+  renderWorkoutTimerPills();
 }
 
 /* Timer loop + display */
@@ -936,7 +928,6 @@ function getWorkoutElapsedMsForDate(date){
     if(!endMs || Number.isNaN(endMs)) return 0;
     return Math.max(0, endMs - startMs);
   }else{
-    // still active
     const nowMs = Date.now();
     return Math.max(0, nowMs - startMs);
   }
@@ -977,14 +968,12 @@ function reconcileWorkoutOnLoad(){
       const cutoff = lastActMs + INACTIVITY_LIMIT_MS;
       const nowMs = Date.now();
       if(nowMs >= cutoff){
-        // auto-end at cutoff
         sToday.workout.endedAt = new Date(cutoff).toISOString();
         saveStore();
       }
     }
   }
 
-  // Start timer loop if today's workout is still active
   if(isToday(currentDate)){
     const s = getSession(currentDate);
     if(s.workout.startedAt && !s.workout.endedAt){
@@ -995,11 +984,11 @@ function reconcileWorkoutOnLoad(){
   updateWorkoutButtons();
 }
 
-/* Inactivity checker (runs regardless of date view, but only acts on today) */
+/* Inactivity checker */
 setInterval(() => {
   const today = todayISO();
   const s = getSession(today);
-  if(!s.workout.startedAt || s.workout.endedAt) return; // no active workout
+  if(!s.workout.startedAt || s.workout.endedAt) return;
 
   const lastActMs = store.ui.lastActivityAt ? Date.parse(store.ui.lastActivityAt) : null;
   if(!lastActMs || Number.isNaN(lastActMs)) return;
@@ -1007,12 +996,10 @@ setInterval(() => {
   const cutoff = lastActMs + INACTIVITY_LIMIT_MS;
   const nowMs = Date.now();
   if(nowMs >= cutoff){
-    // End today's workout at cutoff
     const prevCurrent = currentDate;
-    currentDate = today; // ensure end applies to today session
+    currentDate = today;
     endWorkoutIfRunning({ auto:true, inactivityEndMs:cutoff });
     currentDate = prevCurrent;
-    // timer & pills updated inside endWorkoutIfRunning
   }
 }, INACTIVITY_CHECK_MS);
 
@@ -1024,7 +1011,6 @@ function updateWorkoutButtons(){
   const started = !!s.workout.startedAt;
   const ended = !!s.workout.endedAt;
 
-  // Only today can start manually
   const canStart = isTod && !started && !ended;
   const canEnd = isTod && started && !ended;
 
@@ -1090,7 +1076,6 @@ function showSelectedPanel(payload){
     timedPanel.style.display = "block";
     selectedHint.style.display = "none";
 
-    // if there's existing data for timed exercise, fill it
     const session = getSession(currentDate);
     const existing = session.completed[selected.exercise];
     if(existing && typeof existing.timeMinutes === "number"){
@@ -1120,6 +1105,7 @@ function hideSelectedPanel(){
   clearInProgress(currentDate);
   resetTimedTimer();
 }
+
 function renderSetsTable(){
   if(!selected || selected.timed) return;
 
@@ -1159,7 +1145,7 @@ function renderSetsTable(){
             inputmode="decimal"
             placeholder="e.g., 50"
             value="${escapeAttr(s.weight)}">
-          <button class="btn.bump btn bump small" type="button" data-bump="${idx}">+5</button>
+          <button class="btn bump small" type="button" data-bump="${idx}">+5</button>
         </div>
       </td>
     </tr>
@@ -1175,7 +1161,7 @@ function autoFillFromFirstSet(){
   const reps = norm(base.reps);
   const weightNum = parseFloat(base.weight);
   if(!reps || Number.isNaN(weightNum)) return;
-  // Fill sets 2 and 3 (if present)
+
   for(let i=1; i<selected.sets.length; i++){
     if(!selected.sets[i]) continue;
     if(!selected.sets[i].reps) selected.sets[i].reps = reps;
@@ -1221,11 +1207,10 @@ setsBody.addEventListener("blur", (e) => {
 
   if(!selected || Number.isNaN(idx) || !field) return;
 
-  // Only trigger when leaving Set 1's weight field
   if(idx === 0 && field === "weight"){
     autoFillFromFirstSet();
   }
-}, true); // use capture so blur bubbles up
+}, true);
 
 setsBody.addEventListener("click", (e) => {
   if(!selected || selected.timed) return;
@@ -1233,23 +1218,19 @@ setsBody.addEventListener("click", (e) => {
   // Handle reps -1 / +1 buttons
   const repsBtn = e.target.closest("button[data-reps-delta]");
   if(repsBtn){
-    const idx = Number(repsBtn.getAttribute("data-idx"));
+    const idx = Number(repsBtn.dataset.idx);
     if(Number.isNaN(idx) || !selected.sets[idx]) return;
 
-    const delta = parseInt(repsBtn.getAttribute("data-reps-delta"), 10);
-    if(Number.isNaN(delta)) return;
-
+    const delta = parseInt(repsBtn.dataset.repsDelta, 10) || 0;
     let current = parseInt(selected.sets[idx].reps || "0", 10);
     if(Number.isNaN(current)) current = 0;
 
     // Special rule for Set 1: -1 does nothing unless reps >= 2
     if(idx === 0 && delta === -1 && current < 2){
-      return; // no change
+      return;
     }
 
     let next = current + delta;
-
-    // Never allow reps < 0
     if(next < 0) next = 0;
 
     selected.sets[idx].reps = String(next);
@@ -1329,7 +1310,7 @@ doneBtn.addEventListener("click", () => {
     upsertCompleted(currentDate, selected.exercise, {
       group: selected.group,
       timeMinutes: Number.isNaN(minutesNum) ? 0 : minutesNum,
-      sets: [], // keep field for compatibility
+      sets: [],
       completedAt: new Date().toISOString()
     });
   }else{
@@ -1475,7 +1456,6 @@ groupsGrid.addEventListener("click", (e) => {
     const session = getSession(currentDate);
     const completedData = session.completed?.[exercise];
 
-    // ensure filters include this group if filters are on
     ensureFiltersIncludeGroup(group);
 
     if(completedData){
@@ -1519,7 +1499,6 @@ groupsGrid.addEventListener("click", (e) => {
     openAddForGroup = null;
     renderExerciseGroups();
 
-    // scroll the selected panel into view, instead of top of page
     if (selectedWrap) {
       selectedWrap.scrollIntoView({ behavior: "smooth", block: "start" });
     }
@@ -1753,7 +1732,7 @@ function renderHistory(){
           </span>
         </summary>
         <div style="margin-top:10px;">
-          <table class="table">
+          <table class="table table--history">
             <thead><tr><th>Set</th><th>Reps</th><th>Weight/Time</th></tr></thead>
             <tbody>${details}</tbody>
           </table>
