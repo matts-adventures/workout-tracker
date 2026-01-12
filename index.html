@@ -167,6 +167,9 @@
     }
     .table th{color:var(--muted);font-weight:600;font-size:12px}
     .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;}
+    .table td.mono{
+      white-space: nowrap;
+    }
 
     .add-inline{
       display:grid;
@@ -190,13 +193,12 @@
     .reps-wrap{
       display:flex;
       align-items:center;
-      gap:8px;
+      gap:6px;
       width:100%;
     }
-    /* reps input behaves similar to weight input */
     .reps-input{
-      flex:1;
-      min-width:0;
+      flex:0 0 3.2ch;
+      max-width:3.4ch;
       text-align:right;
     }
     .weight-wrap{
@@ -317,6 +319,10 @@
         white-space:nowrap;
       }
 
+      .reps-wrap{
+        gap:4px;
+      }
+
       /* Keep mobile bump buttons comfy */
       .btn.bump{ padding:10px 12px; border-radius:12px; }
     }
@@ -406,9 +412,9 @@
               <table class="table table--sets" aria-label="Sets table">
                 <thead>
                   <tr>
-                    <th style="width:90px;">Set</th>
-                    <th style="width:170px;">Reps</th>
-                    <th style="width:260px;">Weight</th>
+                    <th style="width:80px;">Set</th>
+                    <th style="width:200px;">Reps</th>
+                    <th style="width:240px;">Weight</th>
                   </tr>
                 </thead>
                 <tbody id="setsBody"></tbody>
