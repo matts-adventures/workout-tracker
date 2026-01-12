@@ -176,13 +176,14 @@
       gap:8px;
     }
 
-    /* UPDATED: narrow numeric inputs to fit ~3 digits */
-    .reps-input,
-    .weight-input{
-      width:4ch;           /* fits 3 numerals at current font size */
-      flex:0 0 auto;
-      text-align:right;
-    }
+   /* Fixed width so 3 digits always fit */
+.reps-input,
+.weight-input{
+  width:70px;      /* <- THIS is the one number you can tweak (try 50–70px range) */
+  padding:8px 6px; /* slightly tighter padding than the global input rule */
+  flex:0 0 auto;
+  text-align:right;
+}
 
     .btn.bump{
       padding:7px 9px;
