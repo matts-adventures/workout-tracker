@@ -186,7 +186,7 @@
       background:rgba(0,0,0,.10);
     }
 
-    /* Reps layout (desktop/tablet) */
+    /* Reps + weight layout */
     .reps-wrap{
       display:flex;
       align-items:center;
@@ -194,11 +194,9 @@
       width:100%;
     }
     .reps-input{
-      width:5.2ch;        /* fits 5 numerals comfortably */
-      padding:6px 4px;
-      text-align:center;
+      width:7ch;     /* roomy for ~5 digits */
+      text-align:right;
     }
-
     .weight-wrap{
       display:flex;
       align-items:center;
@@ -206,7 +204,7 @@
       width:100%;
     }
     .weight-wrap input{
-      min-width:6ch;      /* ensure room for 5 digits */
+      min-width:7ch; /* at least 5 digits of space */
     }
 
     .btn.bump{
@@ -309,7 +307,7 @@
         justify-content:flex-start;
       }
       .table td .reps-input{
-        width:5.2ch;   /* same capacity on mobile */
+        width:7ch;  /* up to 5 digits */
       }
 
       .table td::before{
@@ -320,21 +318,19 @@
         white-space:nowrap;
       }
 
-      /* All non-reps inputs */
+      /* All non-reps inputs (weight/time) take ~60% width */
       .table td input:not(.reps-input){
-        width: 58%;
+        width:58%;
         padding:10px;
         border-radius:12px;
       }
 
       .weight-wrap{
-        width: 58%;
+        width:58%;
         justify-content:flex-end;
       }
-      .weight-wrap input{
-        width: 100%;
-        min-width:6ch;   /* still guarantee 5 digits */
-      }
+      .weight-wrap input{ width:100%; }
+
       .btn.bump{ padding:10px 12px; border-radius:12px; }
     }
   </style>
@@ -449,10 +445,8 @@
             </div>
 
             <div class="row" style="margin-top:10px;">
-              <button class="btn primary" type="button" id="addSetBtn">Add set</button>
-              <button class="btn danger" type="button" id="clearSetsBtn">Clear sets</button>
+              <button class="btn primary" type="button" id="addSetBtn">+1</button>
               <button class="btn ok" type="button" id="doneBtn">DONE</button>
-              <span class="mini" id="selectedHint">Auto-fills sets 2–3 when you leave Set 1 (same reps, +10 weight each set).</span>
             </div>
           </div>
         </div>
@@ -634,10 +628,8 @@ const selectedName = document.getElementById("selectedName");
 const selectedMeta = document.getElementById("selectedMeta");
 const setsBody = document.getElementById("setsBody");
 const addSetBtn = document.getElementById("addSetBtn");
-const clearSetsBtn = document.getElementById("clearSetsBtn");
 const doneBtn = document.getElementById("doneBtn");
 const cancelBtn = document.getElementById("cancelBtn");
-const selectedHint = document.getElementById("selectedHint");
 const liftPanel = document.getElementById("liftPanel");
 const timedPanel = document.getElementById("timedPanel");
 const timedMinutes = document.getElementById("timedMinutes");
@@ -1022,7 +1014,6 @@ setInterval(() => {
     currentDate = today; // ensure end applies to today session
     endWorkoutIfRunning({ auto:true, inactivityEndMs:cutoff });
     currentDate = prevCurrent;
-    // timer & pills updated inside endWorkoutIfRunning
   }
 }, INACTIVITY_CHECK_MS);
 
@@ -1098,7 +1089,6 @@ function showSelectedPanel(payload){
   if(selected.timed){
     liftPanel.style.display = "none";
     timedPanel.style.display = "block";
-    selectedHint.style.display = "none";
 
     // if there's existing data for timed exercise, fill it
     const session = getSession(currentDate);
@@ -1111,7 +1101,6 @@ function showSelectedPanel(payload){
   }else{
     liftPanel.style.display = "block";
     timedPanel.style.display = "none";
-    selectedHint.style.display = "";
     renderSetsTable();
   }
 
@@ -1220,7 +1209,6 @@ setsBody.addEventListener("input", (e) => {
   markActivity();
   maybeAutoStartWorkout();
 });
-
 // Auto-fill sets 2–3 only when you leave Set 1 weight
 setsBody.addEventListener("blur", (e) => {
   const t = e.target;
@@ -1304,19 +1292,7 @@ addSetBtn.addEventListener("click", () => {
   saveInProgress(currentDate, { exercise:selected.exercise, group:selected.group, sets:selected.sets, timed:selected.timed });
   markActivity();
 });
-clearSetsBtn.addEventListener("click", () => {
-  if(!selected) return;
-  if(!confirm("Clear all sets/time for this exercise?")) return;
-  if(selected.timed){
-    timedMinutes.value = "";
-    resetTimedTimer();
-  }else{
-    selected.sets = defaultSets(3);
-    renderSetsTable();
-  }
-  saveInProgress(currentDate, { exercise:selected.exercise, group:selected.group, sets:selected.sets, timed:selected.timed });
-  markActivity();
-});
+
 cancelBtn.addEventListener("click", () => {
   hideSelectedPanel();
   renderAll();
@@ -1527,7 +1503,7 @@ groupsGrid.addEventListener("click", (e) => {
     openAddForGroup = null;
     renderExerciseGroups();
 
-    // scroll the selected panel into view
+    // scroll selected panel into view
     if (selectedWrap) {
       selectedWrap.scrollIntoView({ behavior: "smooth", block: "start" });
     }
