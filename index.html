@@ -435,11 +435,25 @@
 
           <section class="card" aria-label="Backup">
             <h2>Backup</h2>
-            <div class="row" style="margin-bottom:10px;">
+
+            <div class="row" style="margin-bottom:10px; gap:8px; flex-wrap:wrap;">
               <button class="btn ok" type="button" id="exportCsvBtn">Export CSV</button>
+              <button class="btn primary" type="button" id="downloadBackupBtn">Download backup</button>
+              <button class="btn ghost" type="button" id="restoreBackupBtn">Restore backup</button>
+              <!-- Hidden file input for restore -->
+              <input type="file" id="backupFileInput" accept="application/json" style="display:none;" />
             </div>
+
             <div class="mini">
-              Exports one row per set (or one row per timed exercise): <span class="mono">date, group, exercise, set_number, reps, weight_or_time</span>
+              CSV: one row per set (or per timed exercise): <span class="mono">date, group, exercise, set_number, reps, weight_or_time</span>
+            </div>
+            <div class="mini" style="margin-top:4px;">
+              JSON backup: full app data. Save it to iCloud/Drive/Files to keep workouts safe.
+            </div>
+
+            <!-- Weekly nudge pill -->
+            <div class="pill" id="backupNudge" style="margin-top:8px; display:none;">
+              ⚠ No JSON backup in 7+ days. Tap “Download backup” to save your data.
             </div>
           </section>
         </div>
@@ -476,7 +490,7 @@ const todayISO = () => {
 };
 const isToday = (iso) => iso === todayISO();
 
-/* Base store shape includes workout + UI (filters + lastActivity) */
+/* Base store shape includes workout + UI (filters + lastActivity + lastBackup) */
 function baseDefaultStore(){
   return {
     version: 4,
@@ -484,7 +498,8 @@ function baseDefaultStore(){
     sessions: {},
     ui: {
       filters: { upper:false, lower:false, core:false, cardio:false },
-      lastActivityAt: null
+      lastActivityAt: null,
+      lastBackupAt: null
     }
   };
 }
@@ -497,6 +512,7 @@ function normalizeStore(parsedRaw){
   parsed.ui ??= {};
   parsed.ui.filters ??= { upper:false, lower:false, core:false, cardio:false };
   parsed.ui.lastActivityAt ??= null;
+  parsed.ui.lastBackupAt ??= null;
 
   for(const key of ["upper","lower","core","cardio"]){
     parsed.ui.filters[key] = Boolean(parsed.ui.filters[key]);
@@ -608,6 +624,10 @@ const todaySummary = document.getElementById("todaySummary");
 const todayList = document.getElementById("todayList");
 
 const exportCsvBtn = document.getElementById("exportCsvBtn");
+const downloadBackupBtn = document.getElementById("downloadBackupBtn");
+const restoreBackupBtn = document.getElementById("restoreBackupBtn");
+const backupFileInput = document.getElementById("backupFileInput");
+const backupNudge = document.getElementById("backupNudge");
 
 const historyWrap = document.getElementById("historyWrap");
 const historySearch = document.getElementById("historySearch");
@@ -702,6 +722,36 @@ function formatDuration(ms){
   const minutes = Math.floor(totalSec / 60);
   const seconds = totalSec % 60;
   return `${minutes}:${String(seconds).padStart(2,"0")}`;
+}
+
+/* ===========================
+   Backup helpers
+   =========================== */
+function daysSince(iso){
+  if(!iso) return Infinity;
+  const t = Date.parse(iso);
+  if(Number.isNaN(t)) return Infinity;
+  const now = Date.now();
+  const diffMs = now - t;
+  return diffMs / (1000 * 60 * 60 * 24);
+}
+function hasAnyData(){
+  return Object.keys(store.sessions || {}).length > 0;
+}
+function renderBackupNudge(){
+  if(!backupNudge) return;
+
+  if(!hasAnyData()){
+    backupNudge.style.display = "none";
+    return;
+  }
+
+  const d = daysSince(store.ui.lastBackupAt);
+  if(d >= 7){
+    backupNudge.style.display = "inline-flex";
+  }else{
+    backupNudge.style.display = "none";
+  }
 }
 
 /* ===========================
@@ -1797,6 +1847,87 @@ exportCsvBtn.addEventListener("click", () => {
 });
 
 /* ===========================
+   JSON backup (download)
+   =========================== */
+downloadBackupBtn.addEventListener("click", () => {
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw){
+      alert("No data to backup yet.");
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0,10);
+    const fileName = `workout-backup-${today}.json`;
+
+    const blob = new Blob([raw], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    store.ui.lastBackupAt = new Date().toISOString();
+    saveStore();
+    renderBackupNudge();
+  }catch(err){
+    console.error("Backup failed:", err);
+    alert("Sorry, something went wrong making the backup.");
+  }
+});
+
+/* ===========================
+   JSON backup (restore)
+   =========================== */
+restoreBackupBtn.addEventListener("click", () => {
+  if(!backupFileInput) return;
+  backupFileInput.value = "";
+  backupFileInput.click();
+});
+
+backupFileInput.addEventListener("change", () => {
+  const file = backupFileInput.files && backupFileInput.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try{
+      const text = String(evt.target.result || "");
+      const parsed = JSON.parse(text);
+
+      if(!parsed || typeof parsed !== "object"){
+        alert("Backup file format is invalid.");
+        return;
+      }
+
+      if(parsed.version !== 4 && parsed.version !== store.version){
+        if(!confirm("Backup version is different. Restore anyway?")){
+          return;
+        }
+      }
+
+      if(!confirm("Restore this backup? This will overwrite current data for this device.")){
+        return;
+      }
+
+      const normalized = normalizeStore(parsed);
+      store = normalized;
+      saveStore();
+
+      alert("Backup restored. The page will reload.");
+      location.reload();
+    }catch(err){
+      console.error("Restore failed:", err);
+      alert("Could not read this backup file. Make sure you picked a valid JSON backup exported from this app.");
+    }
+  };
+  reader.readAsText(file);
+});
+
+/* ===========================
    Year counter
    =========================== */
 function renderYearCount(){
@@ -1841,6 +1972,7 @@ function renderAll(){
   renderHistory();
   renderYearCount();
   renderWorkoutTimerPills();
+  renderBackupNudge();
 }
 
 /* ===========================
