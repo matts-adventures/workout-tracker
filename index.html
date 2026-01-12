@@ -185,7 +185,16 @@
       font-size:12px;
       background:rgba(0,0,0,.10);
     }
-
+.reps-wrap{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  width:100%;
+}
+.reps-input{
+  width:3ch;     /* fits up to 3 digits */
+  text-align:right;
+}
     .weight-wrap{
       display:flex;
       align-items:center;
@@ -278,13 +287,21 @@
         border-bottom:1px solid var(--border);
         padding:10px 10px 6px;
       }
-      .table td{
+           .table td{
         border-bottom:none;
         padding:6px 0;
         display:flex;
         justify-content:space-between;
         gap:10px;
         align-items:center;
+      }
+
+      /* Mobile overrides for reps layout */
+      .table td .reps-wrap{
+        justify-content:flex-start;
+      }
+      .table td .reps-input{
+        width:3ch;  /* up to 3 digits */
       }
       .table td::before{
         content: attr(data-label);
@@ -293,7 +310,7 @@
         padding-right:10px;
         white-space:nowrap;
       }
-      .table td input{
+      .table td input:not(.reps-input){
         width: 58%;
         padding:10px;
         border-radius:12px;
@@ -1105,11 +1122,38 @@ function renderSetsTable(){
     <tr>
       <td class="mono" data-label="Set">Set ${idx+1}</td>
       <td data-label="Reps">
-        <input data-field="reps" data-idx="${idx}" inputmode="numeric" placeholder="e.g., 10" value="${escapeAttr(s.reps)}">
+        <div class="reps-wrap">
+          <input
+            class="reps-input"
+            data-field="reps"
+            data-idx="${idx}"
+            inputmode="numeric"
+            placeholder="e.g., 10"
+            value="${escapeAttr(s.reps)}">
+          <button
+            class="btn bump small"
+            type="button"
+            data-reps-delta="-1"
+            data-idx="${idx}">
+            -1
+          </button>
+          <button
+            class="btn bump small"
+            type="button"
+            data-reps-delta="1"
+            data-idx="${idx}">
+            +1
+          </button>
+        </div>
       </td>
       <td data-label="Weight">
         <div class="weight-wrap">
-          <input data-field="weight" data-idx="${idx}" inputmode="decimal" placeholder="e.g., 50" value="${escapeAttr(s.weight)}">
+          <input
+            data-field="weight"
+            data-idx="${idx}"
+            inputmode="decimal"
+            placeholder="e.g., 50"
+            value="${escapeAttr(s.weight)}">
           <button class="btn bump small" type="button" data-bump="${idx}">+5</button>
         </div>
       </td>
@@ -1177,15 +1221,60 @@ setsBody.addEventListener("blur", (e) => {
   }
 }, true); // use capture so blur bubbles up
 setsBody.addEventListener("click", (e) => {
+  if(!selected || selected.timed) return;
+
+  // Handle reps -1 / +1 buttons
+  const repsBtn = e.target.closest("button[data-reps-delta]");
+  if(repsBtn){
+    const idx = Number(repsBtn.dataset.idx);
+    if(Number.isNaN(idx) || !selected.sets[idx]) return;
+
+    const delta = parseInt(repsBtn.dataset.repsDelta, 10) || 0;
+    let current = parseInt(selected.sets[idx].reps || "0", 10);
+    if(Number.isNaN(current)) current = 0;
+
+    // Special rule for Set 1: -1 does nothing unless reps >= 2
+    if(idx === 0 && delta === -1 && current < 2){
+      return; // no change
+    }
+
+    let next = current + delta;
+
+    // Never allow reps < 0
+    if(next < 0) next = 0;
+
+    selected.sets[idx].reps = String(next);
+
+    renderSetsTable();
+    saveInProgress(currentDate, {
+      exercise: selected.exercise,
+      group: selected.group,
+      sets: selected.sets,
+      timed: selected.timed
+    });
+    markActivity();
+    maybeAutoStartWorkout();
+    return;
+  }
+
+  // Handle weight +5 buttons
   const bumpBtn = e.target.closest("button[data-bump]");
-  if(bumpBtn && selected && !selected.timed){
+  if(bumpBtn){
     const idx = Number(bumpBtn.dataset.bump);
     if(Number.isNaN(idx) || !selected.sets[idx]) return;
+
     const current = parseFloat(selected.sets[idx].weight || "0");
     const next = (Number.isNaN(current) ? 0 : current) + 5;
+
     selected.sets[idx].weight = String(next);
+
     renderSetsTable();
-    saveInProgress(currentDate, { exercise:selected.exercise, group:selected.group, sets:selected.sets, timed:selected.timed });
+    saveInProgress(currentDate, {
+      exercise: selected.exercise,
+      group: selected.group,
+      sets: selected.sets,
+      timed: selected.timed
+    });
     markActivity();
     maybeAutoStartWorkout();
   }
