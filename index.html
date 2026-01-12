@@ -194,7 +194,7 @@
       width:100%;
     }
     .reps-input{
-      width:48px;           /* comfortably fits 2–3 digits */
+      width:5.2ch;        /* fits 5 numerals comfortably */
       padding:6px 4px;
       text-align:center;
     }
@@ -205,6 +205,10 @@
       gap:8px;
       width:100%;
     }
+    .weight-wrap input{
+      min-width:6ch;      /* ensure room for 5 digits */
+    }
+
     .btn.bump{
       padding:7px 9px;
       border-radius:10px;
@@ -305,7 +309,7 @@
         justify-content:flex-start;
       }
       .table td .reps-input{
-        width:48px;       /* same as desktop */
+        width:5.2ch;   /* same capacity on mobile */
       }
 
       .table td::before{
@@ -316,7 +320,7 @@
         white-space:nowrap;
       }
 
-      /* All non-reps inputs (re-use previous width) */
+      /* All non-reps inputs */
       .table td input:not(.reps-input){
         width: 58%;
         padding:10px;
@@ -327,7 +331,10 @@
         width: 58%;
         justify-content:flex-end;
       }
-      .weight-wrap input{ width: 100%; }
+      .weight-wrap input{
+        width: 100%;
+        min-width:6ch;   /* still guarantee 5 digits */
+      }
       .btn.bump{ padding:10px 12px; border-radius:12px; }
     }
   </style>
