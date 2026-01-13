@@ -795,6 +795,13 @@ function toggleFilter(key){
   renderFilterButtons();
   renderExerciseGroups();
 }
+  /* ===========================
+   Filter button handlers
+   =========================== */
+filterUpper.addEventListener("click", () => toggleFilter("upper"));
+filterLower.addEventListener("click", () => toggleFilter("lower"));
+filterCore.addEventListener("click", () => toggleFilter("core"));
+filterCardio.addEventListener("click", () => toggleFilter("cardio"));
 
 /* Ensure selected group visible when filters already on */
 function ensureFiltersIncludeGroup(groupName){
